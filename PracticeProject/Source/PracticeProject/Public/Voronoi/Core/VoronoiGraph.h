@@ -22,13 +22,13 @@ class FVoronoiRenderAttorney;
 /** Geometry and construction related flags */
 struct PRACTICEPROJECT_API FVoronoiFlags final
 {
-    uint8 bCrouchedOnly = false, bNoJump = false, bBorder = false, bReserved = false;
+    uint8 bCrouchedOnly = false, bNoJump = false, bBorder = false;
 };
 
 /** Tactics related properties Voronoi faces have */
 struct PRACTICEPROJECT_API FVoronoiTacticalProperties final
 {
-    float Area = 0.f, Luminance = 0.f, Visibility[8] = { 0.f };
+    float Area = 0.f, Visibility[8] = { 0.f };
 
     FORCEINLINE float GetNEVisibility() const { return Visibility[0] + Visibility[1]; }
     FORCEINLINE float GetNWVisibility() const { return Visibility[2] + Visibility[3]; }
@@ -52,7 +52,6 @@ struct PRACTICEPROJECT_API FVoronoiLink final
     const FVoronoiFace *Face;
     bool bJumpRequired;
 
-    FORCEINLINE FVoronoiLink() {}
     FORCEINLINE FVoronoiLink(const FVoronoiFace *InFace, bool InJumpRequired)
         : Face(InFace), bJumpRequired(InJumpRequired) {}
 };
@@ -152,9 +151,9 @@ public:
 class PRACTICEPROJECT_API FVoronoiRenderAttorney final
 {
     friend UVoronoiRenderingComponent;
-    static FORCEINLINE const TArray<TPreserveConstUniquePtr<FVoronoiSurface>>& GetSurfacesToRender(const FVoronoiGraph &InVoronoiGraph)
+    static FORCEINLINE const TArray<TPreserveConstUniquePtr<FVoronoiSurface>>& GetSurfacesToRender(const FVoronoiGraph &InVoronoiGraph, bool &bOutIsGenerationInProgress)
     {
-        if (InVoronoiGraph.bCanRenderGenerated) return InVoronoiGraph.GeneratedSurfaces;
+        if ((bOutIsGenerationInProgress = InVoronoiGraph.bCanRenderGenerated) == true) return InVoronoiGraph.GeneratedSurfaces;
         else return InVoronoiGraph.RenderedSurfaces.Num() > 0 ? InVoronoiGraph.RenderedSurfaces : InVoronoiGraph.Surfaces;
-    }
+    }    
 };

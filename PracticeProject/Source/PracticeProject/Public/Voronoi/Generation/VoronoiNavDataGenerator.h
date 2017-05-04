@@ -10,16 +10,18 @@ class FVoronoiSurfaceTask;
 class FVoronoiDiagramTask;
 class FVoronoiPropertiesTask;
 
-const float TileSize = 1000;
-const float CellSize = 20;
-
 /** Class responsibe for managing a building process */
 class PRACTICEPROJECT_API FVoronoiNavDataGenerator final : public FNavDataGenerator
 {
-    FVoronoiNavDataGenerator(const FVoronoiNavDataGenerator& NoCopy) { check(0); }
-    FVoronoiNavDataGenerator& operator=(const FVoronoiNavDataGenerator& NoCopy) { check(0); return *this; }
+    FVoronoiNavDataGenerator(const FVoronoiNavDataGenerator& NoCopy) = delete;
+    FVoronoiNavDataGenerator& operator=(const FVoronoiNavDataGenerator& NoCopy) = delete;
 
     TWeakObjectPtr<AVoronoiNavData> VoronoiNavData;
+    TWeakObjectPtr<UWorld> World;
+
+    FVoronoiGenerationOptions GenerationOptions;
+    FNavDataConfig AgentProperties;
+
     FBox TotalBounds;
 
     TArray<TUniquePtr<FAsyncTask<FVoronoiGeometryTask>>> VoronoiGeometryTasks;
@@ -39,7 +41,7 @@ class PRACTICEPROJECT_API FVoronoiNavDataGenerator final : public FNavDataGenera
 
 public:
     FORCEINLINE FVoronoiNavDataGenerator(AVoronoiNavData* InVoronoiNavData)
-        : VoronoiNavData(InVoronoiNavData), bBuildCanceled(false), GenerationStartTime(0.f) {}
+        : VoronoiNavData(InVoronoiNavData), World(InVoronoiNavData->GetWorld()), bBuildCanceled(false), GenerationStartTime(0.f) {}
     virtual ~FVoronoiNavDataGenerator() override { CancelBuild(); }
 
     virtual bool RebuildAll() override;
@@ -52,8 +54,13 @@ public:
     virtual int32 GetNumRemaningBuildTasks() const override { return GetNumRunningBuildTasks(); };
     virtual int32 GetNumRunningBuildTasks() const override;
 
-    FORCEINLINE bool IsBuiltCanceled() const { return bBuildCanceled; }
     FORCEINLINE const AVoronoiNavData* GetVoronoiNavData() const { return VoronoiNavData.Get(); }
+    FORCEINLINE const UWorld* GetWorld() const { return World.Get(); }
+
+    FORCEINLINE const FVoronoiGenerationOptions& GetGenerationOptions() const { return GenerationOptions; }
+    FORCEINLINE const FNavDataConfig& GetAgentProperties() const { return AgentProperties; }
+
+    FORCEINLINE bool IsBuildCanceled() const { return bBuildCanceled; }
 };
 
 /** Base class for generator's tasks */
@@ -62,15 +69,14 @@ class PRACTICEPROJECT_API FVoronoiTask : public FNonAbandonableTask
     const FVoronoiNavDataGenerator& ParentGenerator;
 
 protected:
-    const FVoronoiGenerationOptions GenerationOptions;
-    const FNavDataConfig AgentProperties;
+    const FVoronoiGenerationOptions& GenerationOptions;
+    const FNavDataConfig& AgentProperties;
     const UWorld *World;
 
 public:
     FORCEINLINE FVoronoiTask(const FVoronoiNavDataGenerator& InParentGenerator)
-        : ParentGenerator(InParentGenerator), GenerationOptions(InParentGenerator.GetVoronoiNavData()->GetGenerationOptions())
-        , AgentProperties(InParentGenerator.GetVoronoiNavData()->GetConfig()), World(InParentGenerator.GetVoronoiNavData()->GetWorld()) {}
+        : ParentGenerator(InParentGenerator), GenerationOptions(InParentGenerator.GetGenerationOptions()), AgentProperties(InParentGenerator.GetAgentProperties()), World(InParentGenerator.GetWorld()) {}
 
-    FORCEINLINE bool ShouldCancelBuild() const { return ParentGenerator.IsBuiltCanceled(); }
+    FORCEINLINE bool ShouldCancelBuild() const { return ParentGenerator.IsBuildCanceled(); }
     FORCEINLINE TStatId GetStatId() const { RETURN_QUICK_DECLARE_CYCLE_STAT(FVoronoiNavDataGenerator, STATGROUP_ThreadPoolAsyncTasks); }
 };

@@ -70,20 +70,20 @@ float FMathExtended::GetParabolaCollisionX(const FVector2D &Focus1, const FVecto
     const double dbl_Focus1_X = Focus1.X, dbl_Focus1_Y = Focus1.Y;
     const double dbl_Focus2_X = Focus2.X, dbl_Focus2_Y = Focus2.Y;
 
-    const double c1 = 2 * (dbl_Focus1_Y - dbl_DirectrixY);
-    const double c2 = 2 * (dbl_Focus2_Y - dbl_DirectrixY);
+    const double C1 = 2 * (dbl_Focus1_Y - dbl_DirectrixY);
+    const double C2 = 2 * (dbl_Focus2_Y - dbl_DirectrixY);
 
-    const double d1 = dbl_Focus1_X * dbl_Focus1_X + dbl_Focus1_Y * dbl_Focus1_Y - dbl_DirectrixY * dbl_DirectrixY;
-    const double d2 = dbl_Focus2_X * dbl_Focus2_X + dbl_Focus2_Y * dbl_Focus2_Y - dbl_DirectrixY * dbl_DirectrixY;
+    const double D1 = dbl_Focus1_X * dbl_Focus1_X + dbl_Focus1_Y * dbl_Focus1_Y - dbl_DirectrixY * dbl_DirectrixY;
+    const double D2 = dbl_Focus2_X * dbl_Focus2_X + dbl_Focus2_Y * dbl_Focus2_Y - dbl_DirectrixY * dbl_DirectrixY;
 
-    const double a = c2 - c1;
-    const double b = 2 * (dbl_Focus2_X * c1 - dbl_Focus1_X * c2);
-    const double c = d1 * c2 - d2 * c1;
+    const double A = C2 - C1;
+    const double B = 2 * (dbl_Focus2_X * C1 - dbl_Focus1_X * C2);
+    const double C = D1 * C2 - D2 * C1;
 
-    const double D = FMath::Sqrt(b * b - 4 * a * c);
+    const double D = FMath::Sqrt(B * B - 4 * A * C);
 
-    const double X1 = (b < 0 ? -b + D : -b - D) / (2 * a);
-    const double X2 = c / (a * X1);
+    const double X1 = (B < 0 ? -B + D : -B - D) / (2 * A);
+    const double X2 = C / (A * X1);
 
     return Focus1.Y < Focus2.Y ? FMath::Min(X1, X2) : FMath::Max(X1, X2);
 }
@@ -106,14 +106,14 @@ bool FMathExtended::GetParabolaIntersect(const FVector2D &Focus1, const FVector2
     return true;
 }
 
-int32 FMathExtended::Combination(int32 n, int32 k)
+int32 FMathExtended::Combination(int32 N, int32 K)
 {
     static const int32 CacheSize = 20;
     static int32 Cache[CacheSize][CacheSize] = { { 0 } };
 
-    if (Cache[n][k] != 0) return Cache[n][k];
-    if (n < k)            return 0;
-    if (k == 0)           return 1;
+    if (Cache[N][K] != 0) return Cache[N][K];
+    if (N < K)            return 0;
+    if (K == 0)           return 1;
 
-    return Cache[n][k] = Combination(n - 1, k - 1) + Combination(n - 1, k);
+    return Cache[N][K] = Combination(N - 1, K - 1) + Combination(N - 1, K);
 }

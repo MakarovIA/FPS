@@ -23,7 +23,7 @@ struct PRACTICEPROJECT_API FVoronoiQuerierParameters
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "10000.0"))
     float PenaltyForJump;
 
-    FVoronoiQuerierParameters()
+    FORCEINLINE FVoronoiQuerierParameters()
         : PenaltyForRotation(200), PenaltyMultiplierForCrouch(1), PenaltyForJump(0) {}
 };
 
@@ -34,8 +34,8 @@ class UVoronoiQuerier : public UInterface
     GENERATED_UINTERFACE_BODY()
 };
 
-/** Smth that is able to make customized queries to VoronoiNavData */
-class IVoronoiQuerier
+/** Something able to make customized queries to VoronoiNavData */
+class PRACTICEPROJECT_API IVoronoiQuerier
 {
     GENERATED_IINTERFACE_BODY()
 

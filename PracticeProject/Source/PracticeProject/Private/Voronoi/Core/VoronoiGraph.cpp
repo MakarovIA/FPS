@@ -5,7 +5,7 @@
 
 /** FVoronoiGraph */
 
-int32 VERSION = 5;
+int32 VERSION = 6;
 FName FRIENDLY_NAME = TEXT("VoronoiVersion");
 FGuid GUID(0x8335131F, 0x7EA94C36, 0xBDAD5D6D, 0xB93EAD9F);
 FCustomVersionRegistration GRegisterVoronoiCustomVersion(GUID, 1, FRIENDLY_NAME);

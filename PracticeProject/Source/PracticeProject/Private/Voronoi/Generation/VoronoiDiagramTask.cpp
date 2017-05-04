@@ -169,12 +169,14 @@ void FVoronoiDiagramTask::AdjustFaceLocation(FVoronoiFace *Face)
 
 void FVoronoiDiagramTask::DoWork()
 {
-    float SweepLineY = 0;
     TUniquePtr<FTreeNode> Root = nullptr;
+    float SweepLineY = 0;
 
     TArray<TUniquePtr<FEvent>> EventQueue;
-    for (TPreserveConstUniquePtr<FVoronoiFace> &i : VoronoiSurface->Faces)
-        EventQueue.Add(MakeUnique<FSiteEvent>(i));
+    EventQueue.Reserve(VoronoiSurface->Faces.Num());
+
+    for (TPreserveConstUniquePtr<FVoronoiFace> &Face : VoronoiSurface->Faces)
+        EventQueue.Add(MakeUnique<FSiteEvent>(Face));
     EventQueue.Heapify();
 
     while (EventQueue.Num() > 0)
@@ -432,7 +434,7 @@ void FVoronoiDiagramTask::DoWork()
             // -------------------------------------------------------------------------------------------------------
 
             const FVector A = VoronoiSurface->Borders[k][i];
-            const FVector B = VoronoiSurface->Borders[k][(i + 1) % N];
+            const FVector B = VoronoiSurface->Borders[k][i + 1 < N ? i + 1 : 0];
             const FVector BorderDirection = (B - A).GetSafeNormal();
 
             const double BorderLineX = (double)B.X - (double)A.X;
@@ -473,7 +475,7 @@ void FVoronoiDiagramTask::DoWork()
                 const FVector D = Candidates[j]->LastVertex->Location;
 
                 FVector Intersection;
-                if (FMath::SegmentIntersection2D(A, VoronoiSurface->Borders[k][(i + 1) % N], C, D, Intersection))
+                if (FMath::SegmentIntersection2D(A, VoronoiSurface->Borders[k][i + 1 < N ? i + 1 : 0], C, D, Intersection))
                     IntersectingEdges.Emplace(Candidates[j], Intersection);
             }
 
@@ -576,9 +578,9 @@ void FVoronoiDiagramTask::DoWork()
                 else
                 {
                     LastEdge->LastVertex = FirstEdge->FirstVertex;
-                    LastEdge->NextEdge = FirstEdge;
-
                     LastEdge->LastVertex->Edge = LastEdge;
+
+                    LastEdge->NextEdge = FirstEdge;
                     FirstEdge->PreviousEdge = LastEdge;
                 }
             }

@@ -21,8 +21,7 @@ struct FVoronoiGeometryCache
     int32* Indices;
 
     FORCEINLINE FVoronoiGeometryCache(const uint8* Memory)
-        : Header(*((FHeader*)Memory))
-        , Verts((float*)(Memory + sizeof(FVoronoiGeometryCache)))
+        : Header(*((FHeader*)Memory)), Verts((float*)(Memory + sizeof(FVoronoiGeometryCache)))
         , Indices((int32*)(Memory + sizeof(FVoronoiGeometryCache) + (sizeof(float) * Header.NumVerts * 3))) {}
 };
 
@@ -119,9 +118,9 @@ void FVoronoiGeometryTask::DoWork()
 
     const FVector TileBBSize = TileBB.GetSize();
 
-    const int32 TileBBSizeX = FMath::RoundToInt(TileBBSize.X / CellSize);
-    const int32 TileBBSizeY = FMath::RoundToInt(TileBBSize.Y / CellSize);
-    const int32 TileBBSizeZ = FMath::RoundToInt(TileBBSize.Z / CellSize);
+    const int32 TileBBSizeX = FMath::RoundToInt(TileBBSize.X / GenerationOptions.CellSize);
+    const int32 TileBBSizeY = FMath::RoundToInt(TileBBSize.Y / GenerationOptions.CellSize);
+    const int32 TileBBSizeZ = FMath::RoundToInt(TileBBSize.Z / GenerationOptions.CellSize);
 
     TArray<EHeightFieldState> ColumnTemp;
     TArray<TArray<EHeightFieldState>> ProfileTemp;
@@ -150,9 +149,9 @@ void FVoronoiGeometryTask::DoWork()
 
             const FBox TriangleAABB = FBox(TriangleVertexes).ShiftBy(-TileBB.Min);
 
-            const int32 MinX = FMath::Max(0, FMath::FloorToInt((TriangleAABB.Min.X - 1) / CellSize)), MaxX = FMath::Min(TileBBSizeX, FMath::CeilToInt((TriangleAABB.Max.X + 1) / CellSize));
-            const int32 MinY = FMath::Max(0, FMath::FloorToInt((TriangleAABB.Min.Y - 1) / CellSize)), MaxY = FMath::Min(TileBBSizeY, FMath::CeilToInt((TriangleAABB.Max.Y + 1) / CellSize));
-            const int32 MinZ = FMath::Max(0, FMath::FloorToInt((TriangleAABB.Min.Z - 1) / CellSize)), MaxZ = FMath::Min(TileBBSizeZ, FMath::CeilToInt((TriangleAABB.Max.Z + 1) / CellSize));
+            const int32 MinX = FMath::Max(0, FMath::FloorToInt((TriangleAABB.Min.X - 1) / GenerationOptions.CellSize)), MaxX = FMath::Min(TileBBSizeX, FMath::CeilToInt((TriangleAABB.Max.X + 1) / GenerationOptions.CellSize));
+            const int32 MinY = FMath::Max(0, FMath::FloorToInt((TriangleAABB.Min.Y - 1) / GenerationOptions.CellSize)), MaxY = FMath::Min(TileBBSizeY, FMath::CeilToInt((TriangleAABB.Max.Y + 1) / GenerationOptions.CellSize));
+            const int32 MinZ = FMath::Max(0, FMath::FloorToInt((TriangleAABB.Min.Z - 1) / GenerationOptions.CellSize)), MaxZ = FMath::Min(TileBBSizeZ, FMath::CeilToInt((TriangleAABB.Max.Z + 1) / GenerationOptions.CellSize));
 
             for (int32 X = MinX; X < MaxX; ++X)
             {
@@ -160,26 +159,30 @@ void FVoronoiGeometryTask::DoWork()
                 {
                     for (int32 Z = MinZ; Z < MaxZ; ++Z)
                     {
-                        const FVector TestBoxMin = TileBB.Min + FVector(X * CellSize, Y * CellSize, Z * CellSize);
+                        if (HeightField[X][Y][Z] == EHeightFieldState::Obstacle && !bIsWalkable)
+                            continue;
+
+                        const FVector TestBoxMin = TileBB.Min + FVector(X * GenerationOptions.CellSize, Y * GenerationOptions.CellSize, Z * GenerationOptions.CellSize);
                         const TArray<FVector> TestBoxNormals = { FVector(1, 0, 0), FVector(0, 1, 0), FVector(0, 0, 1) };
-                        const TArray<FVector> TestBoxVertexes = { TestBoxMin, TestBoxMin + FVector(CellSize, 0, 0), TestBoxMin + FVector(0, CellSize, 0), TestBoxMin + FVector(0, 0, CellSize),
-                            TestBoxMin + FVector(CellSize, CellSize, 0), TestBoxMin + FVector(CellSize, 0, CellSize), TestBoxMin + FVector(0, CellSize, CellSize), TestBoxMin + FVector(CellSize, CellSize, CellSize) };
+                        const TArray<FVector> TestBoxVertexes = { TestBoxMin, TestBoxMin + FVector(GenerationOptions.CellSize, 0, 0), TestBoxMin + FVector(0, GenerationOptions.CellSize, 0),
+                            TestBoxMin + FVector(0, 0, GenerationOptions.CellSize), TestBoxMin + FVector(GenerationOptions.CellSize, GenerationOptions.CellSize, 0), TestBoxMin + FVector(GenerationOptions.CellSize, 0, GenerationOptions.CellSize),
+                            TestBoxMin + FVector(0, GenerationOptions.CellSize, GenerationOptions.CellSize), TestBoxMin + FVector(GenerationOptions.CellSize, GenerationOptions.CellSize, GenerationOptions.CellSize) };
 
                         EHeightFieldState Temp = HeightField[X][Y][Z];
                         HeightField[X][Y][Z] = EHeightFieldState::Obstacle;
 
-                        for (int32 t = 0; t < 3; ++t)
+                        for (int32 j = 0; j < 3; ++j)
                         {
-                            for (int32 j = 0; j < 3; ++j)
+                            for (int32 k = 0; k < 3; ++k)
                             {
                                 float BoxProjectionMin, BoxProjectionMax, TriangleProjectionMin, TriangleProjectionMax;
-                                const FVector Axis = TriangleEdges[t] ^ TestBoxNormals[j];
+                                const FVector Axis = TriangleEdges[j] ^ TestBoxNormals[k];
 
                                 FMathExtended::ProjectOnAxis(TestBoxVertexes, Axis, BoxProjectionMin, BoxProjectionMax);
                                 FMathExtended::ProjectOnAxis(TriangleVertexes, Axis, TriangleProjectionMin, TriangleProjectionMax);
 
                                 if (BoxProjectionMax < TriangleProjectionMin || BoxProjectionMin > TriangleProjectionMax)
-                                    HeightField[X][Y][Z] = Temp, t = 3, j = 3;
+                                    HeightField[X][Y][Z] = Temp, j = 3, k = 3;
                             }
                         }
 
@@ -213,14 +216,14 @@ void FVoronoiGeometryTask::DoWork()
                 if (ShouldCancelBuild())
                     return;
 
-                if (HeightField[i][j][k] == EHeightFieldState::Empty && (HeightAvaliable += CellSize) > AgentCrouchedHeight && LastWalkable != -1)
-                    CompressedHeightField[i][j].Add(TileBB.Min.Z + LastWalkable * CellSize), LastWalkable = -1;
+                if (HeightField[i][j][k] == EHeightFieldState::Empty && (HeightAvaliable += GenerationOptions.CellSize) > AgentCrouchedHeight && LastWalkable != -1)
+                    CompressedHeightField[i][j].Add(TileBB.Min.Z + LastWalkable * GenerationOptions.CellSize), LastWalkable = -1;
 
                 if (HeightField[i][j][k] == EHeightFieldState::Obstacle)
                     LastWalkable = -1;
 
                 if (HeightField[i][j][k] == EHeightFieldState::Walkable)
-                    HeightAvaliable = CellSize, LastWalkable = k;
+                    HeightAvaliable = GenerationOptions.CellSize, LastWalkable = k;
             }
         }
     }

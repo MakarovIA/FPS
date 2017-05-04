@@ -89,7 +89,7 @@ ENavigationQueryResult::Type AVoronoiNavData::CalcPathLength(const FVector& Path
     return CalcPathLengthAndCost(PathStart, PathEnd, OutPathLength, TempCost, QueryFilter, Querier);
 }
 ENavigationQueryResult::Type AVoronoiNavData::CalcPathLengthAndCost(const FVector& PathStart, const FVector& PathEnd, float& OutPathLength, float& OutPathCost, FSharedConstNavQueryFilter QueryFilter, const UObject* Querier) const
-{ 
+{
     FPathFindingQuery Query(Querier, *this, PathStart, PathEnd, QueryFilter);
     const FPathFindingResult& Result = FindPath(NavDataConfig, Query);
 
@@ -107,7 +107,7 @@ FNavLocation AVoronoiNavData::GetRandomPointInFace(const FVoronoiFace* Face)
 {
 	TArray<FVector> Points;
 	for (const FVoronoiVertex* i : FVoronoiHelper::GetAdjacentVertexes(Face))
-		Points.Emplace(i->Location);
+		Points.Add(i->Location);
 
 	return FNavLocation(FMathExtended::GetRandomPointInPolygon(Points));
 }
@@ -316,15 +316,13 @@ float AVoronoiNavData::Distance(const IVoronoiQuerier* Querier, const FVoronoiFa
 }
 
 // NOT VIRTUAL FUNCTIONS
-void AVoronoiNavData::OnVoronoiNavDataGenerationFinished(double TimeSpent)
+void AVoronoiNavData::OnVoronoiNavDataGenerationFinished()
 {
-	UE_LOG(LogNavigation, Log, TEXT("Voronoi navigation data successfully generated in %d ms"), (int32)(TimeSpent * 1000));
-
 	if (GetWorld() && GetWorld()->GetNavigationSystem())
 		GetWorld()->GetNavigationSystem()->OnNavigationGenerationFinished(*this);
 
-	for (FNavPathWeakPtr& Path : ActivePaths)
-		if (Path.IsValid()) RequestRePath(Path.Pin(), ENavPathUpdateType::NavigationChanged);
+    for (FNavPathWeakPtr& Path : ActivePaths.FilterByPredicate([](const FNavPathWeakPtr& InPath) { return InPath.IsValid(); }))
+		RequestRePath(Path.Pin(), ENavPathUpdateType::NavigationChanged);
 
 	if (UVoronoiRenderingComponent::IsNavigationShowFlagSet(GetWorld()))
 		UpdateVoronoiGraphDrawing();

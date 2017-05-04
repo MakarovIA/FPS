@@ -39,7 +39,9 @@ void FVoronoiPropertiesTask::DoWork()
             if (!BorderFace->Flags.bBorder)
                 continue;
 
-            const TArray<FVoronoiEdge*> BorderEdges = FVoronoiHelper::GetAdjacentEdges(BorderFace).FilterByPredicate([](const FVoronoiEdge* Edge) { return !Edge->LeftFace; });
+            const TArray<FVoronoiEdge*> AdjacentEdges = FVoronoiHelper::GetAdjacentEdges(BorderFace);
+            const TArray<FVoronoiEdge*> BorderEdges = AdjacentEdges.FilterByPredicate([](const FVoronoiEdge* Edge) { return !Edge->LeftFace; });
+
             for (TPreserveConstUniquePtr<FVoronoiSurface>& TempSurface : *GeneratedSurfaces)
             {
                 if (TempSurface == Surface)
@@ -145,8 +147,7 @@ void FVoronoiPropertiesTask::DoWork()
             if (ShouldCancelBuild())
                 return;
 
-            for (int32 i = 0; i < 8; ++i)
-                Face->TacticalProperties.Visibility[i] = 0;
+            float Visibility[8] = { 0.f };
 
             TArray<FVoronoiFace*> NeighboorFaces;
             for (TPreserveConstUniquePtr<FVoronoiSurface>& TempSurface : *GeneratedSurfaces)
@@ -171,19 +172,21 @@ void FVoronoiPropertiesTask::DoWork()
                 const float Angle = FMath::Atan2(Face->Location.Y - Other->Location.Y, Face->Location.X - Other->Location.X) * 180 / PI;
                 const float VisibleArea = Other->TacticalProperties.Area * Hits / 6;
 
-                if (Angle >= 0    && Angle < 45)    Face->TacticalProperties.Visibility[0] += VisibleArea;
-                if (Angle >= 45   && Angle < 90)    Face->TacticalProperties.Visibility[1] += VisibleArea;
-                if (Angle >= 90   && Angle < 135)   Face->TacticalProperties.Visibility[2] += VisibleArea;
-                if (Angle >= 135)                   Face->TacticalProperties.Visibility[3] += VisibleArea;
+                if (Angle >= 0    && Angle < 45)    Visibility[0] += VisibleArea;
+                if (Angle >= 45   && Angle < 90)    Visibility[1] += VisibleArea;
+                if (Angle >= 90   && Angle < 135)   Visibility[2] += VisibleArea;
+                if (Angle >= 135)                   Visibility[3] += VisibleArea;
 
-                if (Angle < -135)                   Face->TacticalProperties.Visibility[4] += VisibleArea;
-                if (Angle >= -135 && Angle < -90)   Face->TacticalProperties.Visibility[5] += VisibleArea;
-                if (Angle >= -90  && Angle < -45)   Face->TacticalProperties.Visibility[6] += VisibleArea;
-                if (Angle >= -45  && Angle < 0)     Face->TacticalProperties.Visibility[7] += VisibleArea;
+                if (Angle < -135)                   Visibility[4] += VisibleArea;
+                if (Angle >= -135 && Angle < -90)   Visibility[5] += VisibleArea;
+                if (Angle >= -90  && Angle < -45)   Visibility[6] += VisibleArea;
+                if (Angle >= -45  && Angle < 0)     Visibility[7] += VisibleArea;
             }
 
             for (int32 i = 0; i < 8; ++i)
-                Face->TacticalProperties.Visibility[i] = FMath::Min(0.125f, Face->TacticalProperties.Visibility[i] / (1.5f * GenerationOptions.VisibilityRadius * GenerationOptions.VisibilityRadius * PI));
+                Visibility[i] = FMath::Min(0.125f, Visibility[i] / (1.5f * GenerationOptions.VisibilityRadius * GenerationOptions.VisibilityRadius * PI));
+
+            FMemory::Memcpy(Face->TacticalProperties.Visibility, Visibility, 8 * sizeof(float));
         }
     }
 }

@@ -19,13 +19,21 @@ struct PRACTICEPROJECT_API FVoronoiGenerationOptions
 {
     GENERATED_USTRUCT_BODY()
 
-    /** Indicates density of Voronoi sites */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "1.0"))
-    float SitesPerSquareMeter;
+    /** Indicates precision used to voxelize geometry */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "10.0", ClampMax = "100.0"))
+    float CellSize;
+
+    /** Indicates space between navigable area border and obstacle */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "100.0"))
+    float BorderIndent;
 
     /** Indicates precision used to interpolate borders */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "100.0"))
     float MaxBorderDeviation;
+
+    /** Indicates density of Voronoi sites */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "1.0"))
+    float SitesPerSquareMeter;
 
     /** Indicates whether to draw links */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "1000.0"))
@@ -36,7 +44,7 @@ struct PRACTICEPROJECT_API FVoronoiGenerationOptions
     float VisibilityRadius;
 
     FORCEINLINE FVoronoiGenerationOptions()
-        : SitesPerSquareMeter(0.5f), MaxBorderDeviation(20.f), LinksSearchRadius(500.f), VisibilityRadius(2000.f) {}
+        : CellSize(20.f), BorderIndent(0.f), MaxBorderDeviation(20.f), SitesPerSquareMeter(0.5f), LinksSearchRadius(500.f), VisibilityRadius(2000.f) {}
 };
 
 /** Drawing modes */
@@ -87,7 +95,7 @@ struct PRACTICEPROJECT_API FVoronoiDrawingOptions
 
     FORCEINLINE FVoronoiDrawingOptions()
         : FaceDrawingMode(EVoronoiFaceDrawingMode::Standard), bDrawEdges(true), bDrawLinks(false), bDrawSurfaces(false)
-        , VoronoiMaterial(Cast<UMaterialInterface>(StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, TEXT("/Game/Voronoi/VoronoiMaterial.VoronoiMaterial"), nullptr, LOAD_None, nullptr))) {}
+        , VoronoiMaterial(static_cast<UMaterialInterface*>(StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, TEXT("/Game/Voronoi/VoronoiMaterial.VoronoiMaterial"), nullptr, LOAD_None, nullptr))) {}
 };
 
 /** Navigation based on the use of Voronoi diagrams */
@@ -182,9 +190,8 @@ public:
     // ----------------------------------
     // NOT VIRTUAL FUNCIONS
     // ----------------------------------
-
-	/** Generator calls this when a graph is ready. Used for logs and debug drawing */
-	void OnVoronoiNavDataGenerationFinished(double TimeSpent);
+    
+    void OnVoronoiNavDataGenerationFinished();
 
     const FVoronoiFace* GetFaceByPoint(const FVector& Point, bool bProjectPoint = true) const;
     FVoronoiFace* GetFaceByPoint(const FVector& Point, bool bProjectPoint = true);
@@ -192,7 +199,6 @@ public:
     TArray<const FVoronoiFace*> GetFacesInRadius(const FVector& Origin, float Radius) const;
     TArray<const FVoronoiFace*> GetReachableFacesInRadius(const FVector& Origin, float Radius) const;
 
-    /** Causes rendering update */
     FORCEINLINE void UpdateVoronoiGraphDrawing()
 	{
 		if (RenderingComp && RenderingComp->IsVisible()) 
@@ -200,10 +206,9 @@ public:
 	}
 
     // -----------------------------------
-    // IVoronoiQuerier interface begin
+    // IVoronoiQuerier interface
     // -----------------------------------
 
-    /** Get penalty modification parameters for pathfinding */
     virtual const FVoronoiQuerierParameters& GetVoronoiQuerierParameters() const override { return VoronoiQuerierDefaults; }
 
     // -----------------------------------

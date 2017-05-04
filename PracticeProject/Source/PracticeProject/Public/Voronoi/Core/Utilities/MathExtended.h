@@ -13,5 +13,5 @@ struct PRACTICEPROJECT_API FMathExtended
     static float GetParabolaCollisionX(const FVector2D &Focus1, const FVector2D &Focus2, float DirectrixY);
     static bool GetParabolaIntersect(const FVector2D &Focus1, const FVector2D &Focus2, const FVector2D &Focus3, FVector2D &Circumcenter, float &DirectrixY);
 
-    static int32 Combination(int32 n, int32 k);
+    static int32 Combination(int32 N, int32 K);
 };

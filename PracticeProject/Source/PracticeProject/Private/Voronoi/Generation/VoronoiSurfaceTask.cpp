@@ -41,10 +41,10 @@ void FVoronoiSurfaceTask::DoWork()
     BorderCellProfileTemp.Init(TArray<FBorderCell>(), YSize);
 
     // ------------------------------------------------------------------------------------
-    // CORRECT BY AGENT RADIUS (TWO EXTRA PASSES TO REMOVE CELL-WIDE PATHS)
+    // CORRECT BY AGENT RADIUS AND BORDER INDENT
     // ------------------------------------------------------------------------------------
 
-    for (int32 Pass = 0, Passes = FMath::CeilToInt(AgentRadius / CellSize); Pass < Passes + 2; ++Pass)
+    for (int32 Pass = 0, Passes = FMath::CeilToInt((AgentRadius + GenerationOptions.BorderIndent) / GenerationOptions.CellSize); Pass < Passes + 2; ++Pass)
     {
         if (ShouldCancelBuild())
             return;
@@ -162,8 +162,8 @@ void FVoronoiSurfaceTask::DoWork()
                 if (!Left || !Right || !Up || !Down)
                     BorderCells[i][j].Emplace(k, Right, Left, Up, Down);
                 else
-                    Surfaces[SurfaceId[i][j][k]].Emplace(FMath::RoundToFloat(GlobalHeightFieldMin.X + (i + .5f) * CellSize),
-                        FMath::RoundToFloat(GlobalHeightFieldMin.Y + (j + .5f) * CellSize), FMath::RoundToFloat(GlobalHeightField[i][j][k]));
+                    Surfaces[SurfaceId[i][j][k]].Emplace(FMath::RoundToFloat(GlobalHeightFieldMin.X + (i + .5f) * GenerationOptions.CellSize),
+                        FMath::RoundToFloat(GlobalHeightFieldMin.Y + (j + .5f) * GenerationOptions.CellSize), FMath::RoundToFloat(GlobalHeightField[i][j][k]));
             }
         }
     }
@@ -192,7 +192,7 @@ void FVoronoiSurfaceTask::DoWork()
                     const float BorderX = !BorderCells[CurrentX][CurrentY][CurrentZ].Left ? 0.f : (!BorderCells[CurrentX][CurrentY][CurrentZ].Right ? 1.f : .5f);
                     const float BorderY = !BorderCells[CurrentX][CurrentY][CurrentZ].Up   ? 0.f : (!BorderCells[CurrentX][CurrentY][CurrentZ].Down  ? 1.f : .5f);
 
-                    SurfaceBorders[Id].Last().Emplace(FMath::RoundToFloat(GlobalHeightFieldMin.X + (CurrentX + BorderX) * CellSize), FMath::RoundToFloat(GlobalHeightFieldMin.Y + (CurrentY + BorderY) * CellSize),
+                    SurfaceBorders[Id].Last().Emplace(FMath::RoundToFloat(GlobalHeightFieldMin.X + (CurrentX + BorderX) * GenerationOptions.CellSize), FMath::RoundToFloat(GlobalHeightFieldMin.Y + (CurrentY + BorderY) * GenerationOptions.CellSize),
                         FMath::RoundToFloat(GlobalHeightField[CurrentX][CurrentY][BorderCells[CurrentX][CurrentY][CurrentZ].OriginalIndex]));
                     BorderCells[CurrentX][CurrentY][CurrentZ].OriginalIndex = -1;
 
@@ -232,19 +232,23 @@ void FVoronoiSurfaceTask::DoWork()
                 return;
 
             TArray<int32> RelaxedBorder;
-            RelaxedBorder.Add(0);
-
-            for (int32 k = 1, sz = SurfaceBorders[i][j].Num(); k < sz; ++k)
+            for (float MaxBorderDeviation = GenerationOptions.MaxBorderDeviation; RelaxedBorder.Num() < 3; MaxBorderDeviation /= 2)
             {
-                const FVector A = SurfaceBorders[i][j][RelaxedBorder.Last()];
-                const FVector B = SurfaceBorders[i][j][k + 1 < sz ? k + 1 : 0];
+                RelaxedBorder.Reset();
+                RelaxedBorder.Add(0);
 
-                float MaxDeviation = 0;
-                for (int32 p = RelaxedBorder.Last() + 1; p <= k; ++p)
-                    MaxDeviation = FMath::Max(MaxDeviation, FMath::PointDistToSegmentSquared(SurfaceBorders[i][j][p], A, B));
+                for (int32 k = 1, sz = SurfaceBorders[i][j].Num(); k < sz; ++k)
+                {
+                    const FVector A = SurfaceBorders[i][j][RelaxedBorder.Last()];
+                    const FVector B = SurfaceBorders[i][j][k + 1 < sz ? k + 1 : 0];
 
-                if (MaxDeviation > GenerationOptions.MaxBorderDeviation * GenerationOptions.MaxBorderDeviation)
-                    RelaxedBorder.Add(k);
+                    float MaxDeviation = 0;
+                    for (int32 p = RelaxedBorder.Last() + 1; p <= k; ++p)
+                        MaxDeviation = FMath::Max(MaxDeviation, FMath::PointDistToSegmentSquared(SurfaceBorders[i][j][p], A, B));
+
+                    if (MaxDeviation > MaxBorderDeviation * MaxBorderDeviation)
+                        RelaxedBorder.Add(k);
+                }
             }
             
             for (int32 k = 0, sz = RelaxedBorder.Num(); k < sz; ++k)

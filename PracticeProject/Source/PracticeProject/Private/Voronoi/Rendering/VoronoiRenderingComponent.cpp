@@ -37,12 +37,15 @@ FPrimitiveSceneProxy* UVoronoiRenderingComponent::CreateSceneProxy()
         if (VoronoiGraph == nullptr)
             return nullptr;
 
+        bool bIsGenerationInProgress;
+        const TArray<TPreserveConstUniquePtr<FVoronoiSurface>>& Surfaces = FVoronoiRenderAttorney::GetSurfacesToRender(*VoronoiGraph, bIsGenerationInProgress);
+
         // ------------------------------------------------------------------------------------------
         // DATA GATHERING
         // ------------------------------------------------------------------------------------------
 
         FVoronoiSceneProxyData Data;
-        for (const FVoronoiSurface* Surface : FVoronoiRenderAttorney::GetSurfacesToRender(*VoronoiGraph))
+        for (const FVoronoiSurface* Surface : Surfaces)
         {
             if (DrawingOptions.bDrawSurfaces)
                 for (const TArray<FVector> &Border : Surface->Borders)
@@ -71,7 +74,7 @@ FPrimitiveSceneProxy* UVoronoiRenderingComponent::CreateSceneProxy()
                     }
                 }
 
-                if (DrawingOptions.bDrawLinks)
+                if (DrawingOptions.bDrawLinks && !bIsGenerationInProgress)
                     for (const FVoronoiLink& Link : Face->Links)
                         Data.Arcs.Emplace(Face->Location, Link.Face->Location, Link.bJumpRequired ? FColor(255, 0, 160) : FColor(255, 160, 0));
             }
