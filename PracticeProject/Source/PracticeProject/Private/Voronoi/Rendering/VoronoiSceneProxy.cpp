@@ -88,7 +88,7 @@ void FVoronoiSceneProxy::GetDynamicMeshElements(const TArray<const FSceneView*>&
                     PDI->DrawLine(Line.Begin, Line.End, Line.Color, SDPG_World, Line.Width);
 
                 for (const FVoronoiSceneProxyData::FLine& Arc : Arcs)
-                    DrawArc(PDI, Arc.Begin, Arc.End, 0.3f, 16, Arc.Color, SDPG_World, Arc.Width);
+                    DrawArc(PDI, Arc.Begin, Arc.End, .3f, 16, Arc.Color, SDPG_World, Arc.Width);
             }
 
             if (MeshBatchElement.NumPrimitives == 0 || VoronoiMaterial == nullptr)

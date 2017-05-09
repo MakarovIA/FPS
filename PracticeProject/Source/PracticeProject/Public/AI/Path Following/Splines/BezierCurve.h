@@ -43,7 +43,7 @@ struct PRACTICEPROJECT_API FBezierCurveBuildParams
 };
 
 /** Class responsible for building a bezier curve */
-class FBezierCurveBuilder
+class PRACTICEPROJECT_API FBezierCurveBuilder
 {
     static TArray<FVector> RetrivePathPoints(const TArray<FNavPathPoint>& NavPathPoints, const FBezierCurveBuildParams &BuildParams, const FNavAgentProperties& AgentProperties, const UWorld* World);
     static TArray<int32> CalculateSubsequencesArray(const TArray<FVector>& PathPoints, const FNavAgentProperties& AgentProperties, const UWorld* World);

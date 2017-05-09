@@ -9,13 +9,11 @@
 
 const FNavPathType FVoronoiNavigationPath::Type;
 
-FVoronoiNavigationPath::FVoronoiNavigationPath()
+void FVoronoiNavigationPath::AddPathPoint(const FVoronoiFace *InFace, const FVector& InLocation, bool bIsJumpRequired)
 {
-    PathType = FVoronoiNavigationPath::Type;
-}
+    if (bIsJumpRequired)
+        JumpPositions.Add(PathFaces.Last());
 
-void FVoronoiNavigationPath::AddPathPoint(const FVoronoiFace *InFace, const FVector& InLocation)
-{
     PathPoints.Emplace(InLocation);
     PathFaces.Add(InFace);
 }

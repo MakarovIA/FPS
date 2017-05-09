@@ -21,8 +21,8 @@ void FVoronoiPropertiesTask::DoWork()
 
     const float Gravity = FMath::Abs(World->GetGravityZ());
 
-    const FVector AgentCrouchedHeight(0, 0, AgentProperties.AgentHeight * 2 / 3);
-    const FVector AgentFullHeight(0, 0, AgentProperties.AgentHeight);
+    const FVector AgentCrouchedHeight(0, 0, GenerationOptions.AgentCrouchedHeight);
+    const FVector AgentFullHeight(0, 0, GenerationOptions.AgentHeight);
 
     const FVector AgentJumpHeight(0, 0, JumpZVelocity * JumpZVelocity / 2 / Gravity);
     const FVector AgentJumpFullHeight = AgentFullHeight + AgentJumpHeight;
@@ -52,7 +52,7 @@ void FVoronoiPropertiesTask::DoWork()
                     if (ShouldCancelBuild())
                         return;
 
-                    if ((Face->Flags.bBorder && Face < BorderFace) || FMath::Abs(BorderFace->Location.Z - Face->Location.Z) > AgentProperties.AgentHeight * 4)
+                    if ((Face->Flags.bBorder && Face < BorderFace) || FMath::Abs(BorderFace->Location.Z - Face->Location.Z) > GenerationOptions.AgentHeight * 4)
                         continue;
 
                     FVector Dummy;
@@ -70,13 +70,13 @@ void FVoronoiPropertiesTask::DoWork()
             return;
 
         if (SmartCollisionCheck(i.First->Location + (i.First->Flags.bCrouchedOnly ? AgentCrouchedHeight : AgentFullHeight),
-            i.Second->Location + (i.Second->Flags.bCrouchedOnly ? AgentCrouchedHeight : AgentFullHeight), AgentProperties.AgentRadius, World))
+            i.Second->Location + (i.Second->Flags.bCrouchedOnly ? AgentCrouchedHeight : AgentFullHeight), GenerationOptions.AgentRadius, World))
             continue;
 
         for (int32 j = 0; j < 2; ++j, Swap(i.First, i.Second))
         {
-            bool bNoJumpVariant = !SmartCollisionCheck(i.First->Location + (i.First->Flags.bCrouchedOnly ? AgentCrouchedHeight : AgentFullHeight), i.Second->Location + FVector(0, 0, 50), AgentProperties.AgentRadius, World);
-            bool bJumpVariant = !i.First->Flags.bNoJump && !SmartCollisionCheck(i.First->Location + AgentJumpFullHeight, i.Second->Location + AgentFullHeight / 10, AgentProperties.AgentRadius, World);
+            bool bNoJumpVariant = !SmartCollisionCheck(i.First->Location + (i.First->Flags.bCrouchedOnly ? AgentCrouchedHeight : AgentFullHeight), i.Second->Location + FVector(0, 0, 50), GenerationOptions.AgentRadius, World);
+            bool bJumpVariant = !i.First->Flags.bNoJump && !SmartCollisionCheck(i.First->Location + AgentJumpFullHeight, i.Second->Location + AgentFullHeight / 10, GenerationOptions.AgentRadius, World);
 
             if (bNoJumpVariant)
             {
@@ -161,7 +161,7 @@ void FVoronoiPropertiesTask::DoWork()
                 if (Face == Other)
                     continue;
 
-                const FVector Normal = FVector(Face->Location.Y - Other->Location.Y, Other->Location.X - Face->Location.X, 0).GetSafeNormal() * AgentProperties.AgentRadius * 0.5f;
+                const FVector Normal = FVector(Face->Location.Y - Other->Location.Y, Other->Location.X - Face->Location.X, 0).GetSafeNormal() * GenerationOptions.AgentRadius * 0.5f;
                 const int32 Hits = !SimpleCollisionCheck(Face->Location + AgentFullHeight / 3, Other->Location + AgentFullHeight / 3, World) +
                     !SimpleCollisionCheck(Face->Location + AgentFullHeight / 3 + Normal, Other->Location + AgentFullHeight / 3 + Normal, World) +
                     !SimpleCollisionCheck(Face->Location + AgentFullHeight / 3 - Normal, Other->Location + AgentFullHeight / 3 - Normal, World) +

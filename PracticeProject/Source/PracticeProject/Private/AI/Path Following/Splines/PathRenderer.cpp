@@ -14,7 +14,7 @@ void FPathRenderer::DrawPiecewiseLinearPath(const UObject* WorldContextObject, c
     const TArray<FNavPathPoint>& PathPoints = Path->GetPathPoints();
 
     for (int32 i = 1, sz = PathPoints.Num(); i < sz; ++i)
-        DrawDebugLine(World, PathPoints[i - 1].Location, PathPoints[i].Location, FColor(255, 165, 0), true, -1, 0, 5.f);  
+        DrawDebugLine(World, PathPoints[i - 1].Location, PathPoints[i].Location, FColor(255, 165, 0), true, -1, 0, 5.f);
 }
 
 void FPathRenderer::DrawSpline(const UObject* WorldContextObject, const FSpline *Spline)

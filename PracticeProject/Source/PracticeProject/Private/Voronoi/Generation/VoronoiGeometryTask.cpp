@@ -10,27 +10,19 @@ struct FVoronoiGeometryCache
 {
     struct FHeader
     {
-        int32 NumVerts;
+        int32 NumVertexes;
         int32 NumFaces;
         FWalkableSlopeOverride SlopeOverride;
     };
 
     FHeader Header;
 
-    float* Verts;
+    float* Vertexes;
     int32* Indices;
 
     FORCEINLINE FVoronoiGeometryCache(const uint8* Memory)
-        : Header(*((FHeader*)Memory)), Verts((float*)(Memory + sizeof(FVoronoiGeometryCache)))
-        , Indices((int32*)(Memory + sizeof(FVoronoiGeometryCache) + (sizeof(float) * Header.NumVerts * 3))) {}
-};
-
-struct FVoronoiRawGeometryElement
-{
-    TArray<float> GeomCoords;
-    TArray<int32> GeomIndices;
-
-    TArray<FTransform> PerInstanceTransform;
+        : Header(*((FHeader*)Memory)), Vertexes((float*)(Memory + sizeof(FVoronoiGeometryCache)))
+        , Indices((int32*)(Memory + sizeof(FVoronoiGeometryCache) + sizeof(float) * Header.NumVertexes * 3)) {}
 };
 
 struct FVoronoiGeometryElement
@@ -38,15 +30,11 @@ struct FVoronoiGeometryElement
     TArray<FVector> Vertexes;
     TArray<int32> Indices;
 
-    FORCEINLINE FVoronoiGeometryElement(FVoronoiRawGeometryElement InElement)
-        : Indices(MoveTemp(InElement.GeomIndices))
+    FORCEINLINE FVoronoiGeometryElement(const FVoronoiGeometryCache& InCachedElement)
     {
-        for (int32 i = 0, sz = InElement.GeomCoords.Num(); i < sz; i += 3)
-            Vertexes.Emplace(-InElement.GeomCoords[i], -InElement.GeomCoords[i + 2], InElement.GeomCoords[i + 1]);
-
-        for (const FTransform& Transform : InElement.PerInstanceTransform)
-            for (int32 i = 0, sz = InElement.GeomCoords.Num(); i < sz; i += 3)
-                Vertexes[i] = Transform.TransformPosition(Vertexes[i]);
+        for (int32 i = 0, sz = InCachedElement.Header.NumVertexes * 3; i < sz; i += 3)
+            Vertexes.Emplace(-InCachedElement.Vertexes[i], -InCachedElement.Vertexes[i + 2], InCachedElement.Vertexes[i + 1]);
+        Indices.Append(InCachedElement.Indices, InCachedElement.Header.NumFaces * 3);
     }
 };
 
@@ -66,38 +54,8 @@ FVoronoiGeometryTask::FVoronoiGeometryTask(const FVoronoiNavDataGenerator& InPar
     for (FNavigationOctree::TConstElementBoxIterator<FNavigationOctree::DefaultStackAllocator> It(*NavOctree, TileBB); It.HasPendingElements(); It.Advance())
     {
         const FNavigationOctreeElement& Element = It.GetCurrentElement();
-        if (Element.ShouldUseGeometry(AgentProperties) && Element.Data->HasGeometry() && !Element.Data->IsPendingLazyGeometryGathering() && Element.Data->GetOwner() != nullptr)
+        if (Element.Data->HasGeometry() && !Element.Data->IsPendingLazyGeometryGathering() && Element.Data->GetOwner())
             NavigationRelevantData.Add(Element.Data);
-    }
-}
-
-void FVoronoiGeometryTask::AppendGeometry(const FNavigationRelevantData& ElementData, TArray<FVoronoiGeometryElement> &Geometry)
-{
-    if (ElementData.CollisionData.Num() == 0)
-        return;
-
-    FVoronoiRawGeometryElement GeometryElement;
-    FVoronoiGeometryCache CollisionCache(ElementData.CollisionData.GetData());
-
-    if (ElementData.NavDataPerInstanceTransformDelegate.IsBound())
-    {
-        ElementData.NavDataPerInstanceTransformDelegate.Execute(TileBB, GeometryElement.PerInstanceTransform);
-        if (GeometryElement.PerInstanceTransform.Num() == 0)
-            return;
-    }
-
-    const int32 NumCoords = CollisionCache.Header.NumVerts * 3;
-    const int32 NumIndices = CollisionCache.Header.NumFaces * 3;
-
-    if (NumIndices > 0)
-    {
-        GeometryElement.GeomCoords.SetNumUninitialized(NumCoords);
-        GeometryElement.GeomIndices.SetNumUninitialized(NumIndices);
-
-        FMemory::Memcpy(GeometryElement.GeomCoords.GetData(), CollisionCache.Verts, sizeof(float) * NumCoords);
-        FMemory::Memcpy(GeometryElement.GeomIndices.GetData(), CollisionCache.Indices, sizeof(int32) * NumIndices);
-
-        Geometry.Emplace(MoveTemp(GeometryElement));
     }
 }
 
@@ -109,18 +67,21 @@ void FVoronoiGeometryTask::DoWork()
         if (ShouldCancelBuild())
             return;
 
-        AppendGeometry(ElementData.Get(), Geometry);
+        if (ElementData->CollisionData.Num() > 0)
+            Geometry.Emplace(FVoronoiGeometryCache(ElementData->CollisionData.GetData()));
     }
 
     // ------------------------------------------------------------------------------------
     // USE COLLECTED GEOMETRY TO CONSTRUCT HEIGHTFIELD
     // ------------------------------------------------------------------------------------
 
-    const FVector TileBBSize = TileBB.GetSize();
+    const FVector TileBBSize = TileBB.GetSize() / GenerationOptions.CellSize;
+    const int32 TileBBSizeX = FMath::RoundToInt(TileBBSize.X), TileBBSizeY = FMath::RoundToInt(TileBBSize.Y), TileBBSizeZ = FMath::RoundToInt(TileBBSize.Z);
 
-    const int32 TileBBSizeX = FMath::RoundToInt(TileBBSize.X / GenerationOptions.CellSize);
-    const int32 TileBBSizeY = FMath::RoundToInt(TileBBSize.Y / GenerationOptions.CellSize);
-    const int32 TileBBSizeZ = FMath::RoundToInt(TileBBSize.Z / GenerationOptions.CellSize);
+    static const TArray<FVector> TestBoxNormals = { FVector(1, 0, 0), FVector(0, 1, 0), FVector(0, 0, 1) };
+    const TArray<FVector> TestBoxVertexes = { FVector(0, 0, 0), FVector(GenerationOptions.CellSize, 0, 0), FVector(0, GenerationOptions.CellSize, 0), FVector(0, 0, GenerationOptions.CellSize),
+        FVector(GenerationOptions.CellSize, GenerationOptions.CellSize, 0), FVector(GenerationOptions.CellSize, 0, GenerationOptions.CellSize), FVector(0, GenerationOptions.CellSize, GenerationOptions.CellSize),
+        FVector(GenerationOptions.CellSize, GenerationOptions.CellSize, GenerationOptions.CellSize) };
 
     TArray<EHeightFieldState> ColumnTemp;
     TArray<TArray<EHeightFieldState>> ProfileTemp;
@@ -137,21 +98,19 @@ void FVoronoiGeometryTask::DoWork()
             if (ShouldCancelBuild())
                 return;
 
-            const FVector& A = Element.Vertexes[Element.Indices[i]];
-            const FVector& B = Element.Vertexes[Element.Indices[i + 1]];
-            const FVector& C = Element.Vertexes[Element.Indices[i + 2]];
+            const TArray<FVector> TriangleVertexes = { Element.Vertexes[Element.Indices[i]], Element.Vertexes[Element.Indices[i + 1]], Element.Vertexes[Element.Indices[i + 2]] };
+            const TArray<FVector> TriangleEdges = { TriangleVertexes[1] - TriangleVertexes[0], TriangleVertexes[2] - TriangleVertexes[0], TriangleVertexes[2] - TriangleVertexes[1] };
 
-            const FVector TriangleNormal = FVector::CrossProduct(B - A, C - A);
-            const bool bIsWalkable = FMath::Abs(TriangleNormal.GetSafeNormal().Z) > 0.75;
-
-            const TArray<FVector> TriangleEdges = { B - A, C - A, B - C };
-            const TArray<FVector> TriangleVertexes = { A, B, C };
-
+            const FVector TriangleNormal = FVector::CrossProduct(TriangleEdges[1], TriangleEdges[0]).GetSafeNormal();
+            const bool bIsWalkable = TriangleNormal.Z > FMath::Cos(FMath::DegreesToRadians(GenerationOptions.AgentWalkableSlope));
+            
             const FBox TriangleAABB = FBox(TriangleVertexes).ShiftBy(-TileBB.Min);
+            const FVector TriangleAABBMin = (TriangleAABB.Min - FVector(1, 1, 1)) / GenerationOptions.CellSize;
+            const FVector TriangleAABBMax = (TriangleAABB.Max + FVector(1, 1, 1)) / GenerationOptions.CellSize;
 
-            const int32 MinX = FMath::Max(0, FMath::FloorToInt((TriangleAABB.Min.X - 1) / GenerationOptions.CellSize)), MaxX = FMath::Min(TileBBSizeX, FMath::CeilToInt((TriangleAABB.Max.X + 1) / GenerationOptions.CellSize));
-            const int32 MinY = FMath::Max(0, FMath::FloorToInt((TriangleAABB.Min.Y - 1) / GenerationOptions.CellSize)), MaxY = FMath::Min(TileBBSizeY, FMath::CeilToInt((TriangleAABB.Max.Y + 1) / GenerationOptions.CellSize));
-            const int32 MinZ = FMath::Max(0, FMath::FloorToInt((TriangleAABB.Min.Z - 1) / GenerationOptions.CellSize)), MaxZ = FMath::Min(TileBBSizeZ, FMath::CeilToInt((TriangleAABB.Max.Z + 1) / GenerationOptions.CellSize));
+            const int32 MinX = FMath::Max(0, FMath::FloorToInt(TriangleAABBMin.X)), MaxX = FMath::Min(TileBBSizeX, FMath::CeilToInt(TriangleAABBMax.X));
+            const int32 MinY = FMath::Max(0, FMath::FloorToInt(TriangleAABBMin.Y)), MaxY = FMath::Min(TileBBSizeY, FMath::CeilToInt(TriangleAABBMax.Y));
+            const int32 MinZ = FMath::Max(0, FMath::FloorToInt(TriangleAABBMin.Z)), MaxZ = FMath::Min(TileBBSizeZ, FMath::CeilToInt(TriangleAABBMax.Z));
 
             for (int32 X = MinX; X < MaxX; ++X)
             {
@@ -159,18 +118,20 @@ void FVoronoiGeometryTask::DoWork()
                 {
                     for (int32 Z = MinZ; Z < MaxZ; ++Z)
                     {
-                        if (HeightField[X][Y][Z] == EHeightFieldState::Obstacle && !bIsWalkable)
+                        if ((HeightField[X][Y][Z] == EHeightFieldState::Obstacle && !bIsWalkable) || HeightField[X][Y][Z] == EHeightFieldState::Walkable)
                             continue;
 
                         const FVector TestBoxMin = TileBB.Min + FVector(X * GenerationOptions.CellSize, Y * GenerationOptions.CellSize, Z * GenerationOptions.CellSize);
-                        const TArray<FVector> TestBoxNormals = { FVector(1, 0, 0), FVector(0, 1, 0), FVector(0, 0, 1) };
-                        const TArray<FVector> TestBoxVertexes = { TestBoxMin, TestBoxMin + FVector(GenerationOptions.CellSize, 0, 0), TestBoxMin + FVector(0, GenerationOptions.CellSize, 0),
-                            TestBoxMin + FVector(0, 0, GenerationOptions.CellSize), TestBoxMin + FVector(GenerationOptions.CellSize, GenerationOptions.CellSize, 0), TestBoxMin + FVector(GenerationOptions.CellSize, 0, GenerationOptions.CellSize),
-                            TestBoxMin + FVector(0, GenerationOptions.CellSize, GenerationOptions.CellSize), TestBoxMin + FVector(GenerationOptions.CellSize, GenerationOptions.CellSize, GenerationOptions.CellSize) };
+                        const TArray<FVector> TestTriangleVertexes = { TriangleVertexes[0] - TestBoxMin, TriangleVertexes[1] - TestBoxMin, TriangleVertexes[2] - TestBoxMin };
 
-                        EHeightFieldState Temp = HeightField[X][Y][Z];
-                        HeightField[X][Y][Z] = EHeightFieldState::Obstacle;
+                        float BoxOffsetMin, BoxOffsetMax;
+                        const float TriangleOffset = FVector::DotProduct(TriangleNormal, TestTriangleVertexes[0]);
 
+                        FMathExtended::ProjectOnAxis(TestBoxVertexes, TriangleNormal, BoxOffsetMin, BoxOffsetMax);
+                        if (BoxOffsetMax < TriangleOffset || BoxOffsetMin > TriangleOffset)
+                            continue;
+
+                        bool bIntersects = true;
                         for (int32 j = 0; j < 3; ++j)
                         {
                             for (int32 k = 0; k < 3; ++k)
@@ -179,15 +140,18 @@ void FVoronoiGeometryTask::DoWork()
                                 const FVector Axis = TriangleEdges[j] ^ TestBoxNormals[k];
 
                                 FMathExtended::ProjectOnAxis(TestBoxVertexes, Axis, BoxProjectionMin, BoxProjectionMax);
-                                FMathExtended::ProjectOnAxis(TriangleVertexes, Axis, TriangleProjectionMin, TriangleProjectionMax);
+                                FMathExtended::ProjectOnAxis(TestTriangleVertexes, Axis, TriangleProjectionMin, TriangleProjectionMax);
 
                                 if (BoxProjectionMax < TriangleProjectionMin || BoxProjectionMin > TriangleProjectionMax)
-                                    HeightField[X][Y][Z] = Temp, j = 3, k = 3;
+                                {
+                                    bIntersects = false;
+                                    j = 3, k = 3;
+                                }
                             }
                         }
 
-                        if (bIsWalkable && Z + 1 < TileBBSizeZ && HeightField[X][Y][Z] == EHeightFieldState::Obstacle && HeightField[X][Y][Z + 1] == EHeightFieldState::Empty)
-                            HeightField[X][Y][Z + 1] = EHeightFieldState::Walkable;
+                        if (bIntersects)
+                            HeightField[X][Y][Z] = bIsWalkable ? EHeightFieldState::Walkable : EHeightFieldState::Obstacle;
                     }
                 }
             }
@@ -197,8 +161,6 @@ void FVoronoiGeometryTask::DoWork()
     // ------------------------------------------------------------------------------------
     // COMPRESS HEIGHTFIELD
     // ------------------------------------------------------------------------------------
-
-    const float AgentCrouchedHeight = AgentProperties.AgentHeight * 2 / 3;
 
     TArray<TArray<float>> CompressedProfileTemp;
     CompressedProfileTemp.Init(TArray<float>(), TileBBSizeY);
@@ -216,14 +178,20 @@ void FVoronoiGeometryTask::DoWork()
                 if (ShouldCancelBuild())
                     return;
 
-                if (HeightField[i][j][k] == EHeightFieldState::Empty && (HeightAvaliable += GenerationOptions.CellSize) > AgentCrouchedHeight && LastWalkable != -1)
-                    CompressedHeightField[i][j].Add(TileBB.Min.Z + LastWalkable * GenerationOptions.CellSize), LastWalkable = -1;
+                switch (HeightField[i][j][k])
+                {
+                    case EHeightFieldState::Empty:
+                        if (LastWalkable != -1 && (HeightAvaliable += GenerationOptions.CellSize) > GenerationOptions.AgentCrouchedHeight)
+                            CompressedHeightField[i][j].Add(TileBB.Min.Z + (LastWalkable + 1) * GenerationOptions.CellSize), LastWalkable = -1, HeightAvaliable = 0;
+                        break;
 
-                if (HeightField[i][j][k] == EHeightFieldState::Obstacle)
-                    LastWalkable = -1;
+                    case EHeightFieldState::Obstacle:
+                        LastWalkable = -1;
+                        break;
 
-                if (HeightField[i][j][k] == EHeightFieldState::Walkable)
-                    HeightAvaliable = GenerationOptions.CellSize, LastWalkable = k;
+                    case EHeightFieldState::Walkable:
+                        LastWalkable = k;
+                }
             }
         }
     }

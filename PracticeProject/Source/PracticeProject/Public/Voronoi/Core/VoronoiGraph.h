@@ -50,10 +50,10 @@ struct PRACTICEPROJECT_API FVoronoiTacticalProperties final
 struct PRACTICEPROJECT_API FVoronoiLink final
 {
     const FVoronoiFace *Face;
-    bool bJumpRequired;
+    uint8 bJumpRequired;
 
-    FORCEINLINE FVoronoiLink(const FVoronoiFace *InFace, bool InJumpRequired)
-        : Face(InFace), bJumpRequired(InJumpRequired) {}
+    FORCEINLINE FVoronoiLink(const FVoronoiFace *InFace, uint8 bInJumpRequired)
+        : Face(InFace), bJumpRequired(bInJumpRequired) {}
 };
 
 /** Vertex of Voronoi diagram */
@@ -144,7 +144,7 @@ public:
         : bCanRenderGenerated(false) {}
 
     TArray<TPreserveConstUniquePtr<FVoronoiSurface>> Surfaces;
-    void Serialize(FArchive &Ar);
+    bool Serialize(FArchive &Ar);
 };
 
 /** Proxy class allowing generated surfaces to be rendered */

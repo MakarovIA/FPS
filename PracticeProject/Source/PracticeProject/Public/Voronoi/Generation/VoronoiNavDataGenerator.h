@@ -20,8 +20,6 @@ class PRACTICEPROJECT_API FVoronoiNavDataGenerator final : public FNavDataGenera
     TWeakObjectPtr<UWorld> World;
 
     FVoronoiGenerationOptions GenerationOptions;
-    FNavDataConfig AgentProperties;
-
     FBox TotalBounds;
 
     TArray<TUniquePtr<FAsyncTask<FVoronoiGeometryTask>>> VoronoiGeometryTasks;
@@ -41,7 +39,7 @@ class PRACTICEPROJECT_API FVoronoiNavDataGenerator final : public FNavDataGenera
 
 public:
     FORCEINLINE FVoronoiNavDataGenerator(AVoronoiNavData* InVoronoiNavData)
-        : VoronoiNavData(InVoronoiNavData), World(InVoronoiNavData->GetWorld()), bBuildCanceled(false), GenerationStartTime(0.f) {}
+        : VoronoiNavData(InVoronoiNavData), World(InVoronoiNavData->GetWorld()), GenerationStartTime(0.f), bBuildCanceled(false) {}
     virtual ~FVoronoiNavDataGenerator() override { CancelBuild(); }
 
     virtual bool RebuildAll() override;
@@ -58,8 +56,6 @@ public:
     FORCEINLINE const UWorld* GetWorld() const { return World.Get(); }
 
     FORCEINLINE const FVoronoiGenerationOptions& GetGenerationOptions() const { return GenerationOptions; }
-    FORCEINLINE const FNavDataConfig& GetAgentProperties() const { return AgentProperties; }
-
     FORCEINLINE bool IsBuildCanceled() const { return bBuildCanceled; }
 };
 
@@ -70,12 +66,11 @@ class PRACTICEPROJECT_API FVoronoiTask : public FNonAbandonableTask
 
 protected:
     const FVoronoiGenerationOptions& GenerationOptions;
-    const FNavDataConfig& AgentProperties;
     const UWorld *World;
 
 public:
     FORCEINLINE FVoronoiTask(const FVoronoiNavDataGenerator& InParentGenerator)
-        : ParentGenerator(InParentGenerator), GenerationOptions(InParentGenerator.GetGenerationOptions()), AgentProperties(InParentGenerator.GetAgentProperties()), World(InParentGenerator.GetWorld()) {}
+        : ParentGenerator(InParentGenerator), GenerationOptions(InParentGenerator.GetGenerationOptions()), World(InParentGenerator.GetWorld()) {}
 
     FORCEINLINE bool ShouldCancelBuild() const { return ParentGenerator.IsBuildCanceled(); }
     FORCEINLINE TStatId GetStatId() const { RETURN_QUICK_DECLARE_CYCLE_STAT(FVoronoiNavDataGenerator, STATGROUP_ThreadPoolAsyncTasks); }

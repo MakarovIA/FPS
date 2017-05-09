@@ -5,18 +5,18 @@
 
 /** FVoronoiGraph */
 
-int32 VERSION = 6;
+int32 VERSION = 7;
 FName FRIENDLY_NAME = TEXT("VoronoiVersion");
 FGuid GUID(0x8335131F, 0x7EA94C36, 0xBDAD5D6D, 0xB93EAD9F);
 FCustomVersionRegistration GRegisterVoronoiCustomVersion(GUID, 1, FRIENDLY_NAME);
 
-void FVoronoiGraph::Serialize(FArchive &Ar)
+bool FVoronoiGraph::Serialize(FArchive &Ar)
 {
     check(GeneratedSurfaces.Num() == 0);
 
     const FCustomVersion *VoronoiVersion = Ar.GetCustomVersions().GetVersion(GUID);
     if (Ar.IsLoading() && VoronoiVersion == nullptr)
-        return; 
+        return false; 
 
     const int64 SizePosition = Ar.Tell();
     int32 SizeInBytes = 0, ArchiveVersion = VERSION;
@@ -25,11 +25,8 @@ void FVoronoiGraph::Serialize(FArchive &Ar)
     if (Ar.IsLoading() && ArchiveVersion != VERSION)
     {
         Ar.Seek(Ar.Tell() + SizeInBytes - sizeof(SizeInBytes) - sizeof(ArchiveVersion));
-        return;
+        return false;
     }
-
-    if (Ar.IsSaving())
-        Ar.SetCustomVersion(GUID, 1, FRIENDLY_NAME);
 
     SerializeInternal(Ar);
 
@@ -41,7 +38,11 @@ void FVoronoiGraph::Serialize(FArchive &Ar)
         Ar.Seek(SizePosition);
         Ar << SizeInBytes;
         Ar.Seek(CurrentPosition);
+
+        Ar.SetCustomVersion(GUID, 1, FRIENDLY_NAME);
     }
+
+    return true;
 }
 
 void FVoronoiGraph::SerializeInternal(FArchive &Ar)
@@ -126,7 +127,7 @@ void FVoronoiGraph::SerializeInternal(FArchive &Ar)
                 int32 SurfaceID = Ar.IsSaving() ? SurfacesIndexes[Surfaces[i]->Faces[j]->Links[k].Face->Surface] : 0;
                 int32 FaceID = Ar.IsSaving() ? FacesIndexes[SurfaceID][Surfaces[i]->Faces[j]->Links[k].Face] : 0;
 
-                bool bJumpRequired = Ar.IsSaving() ? Surfaces[i]->Faces[j]->Links[k].bJumpRequired : false;
+                uint8 bJumpRequired = Ar.IsSaving() ? Surfaces[i]->Faces[j]->Links[k].bJumpRequired : 0;
                 Ar << SurfaceID << FaceID << bJumpRequired;
 
                 if (Ar.IsLoading())

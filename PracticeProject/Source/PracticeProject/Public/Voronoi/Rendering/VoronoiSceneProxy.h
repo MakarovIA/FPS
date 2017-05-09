@@ -23,25 +23,22 @@ struct PRACTICEPROJECT_API FVoronoiMeshVertex
 };
 
 /** Vertex Buffer */
-class PRACTICEPROJECT_API FVoronoiVertexBuffer : public FVertexBuffer
+struct PRACTICEPROJECT_API FVoronoiVertexBuffer : public FVertexBuffer
 {
-public:
     TArray<FVoronoiMeshVertex> Vertices;
     virtual void InitRHI() override;
 };
 
 /** Index Buffer */
-class PRACTICEPROJECT_API FVoronoiIndexBuffer : public FIndexBuffer
+struct PRACTICEPROJECT_API FVoronoiIndexBuffer : public FIndexBuffer
 {
-public:
     TArray<int32> Indices;
     virtual void InitRHI() override;
 };
 
 /** Vertex Factory */
-class PRACTICEPROJECT_API FVoronoiVertexFactory : public FLocalVertexFactory
+struct PRACTICEPROJECT_API FVoronoiVertexFactory : public FLocalVertexFactory
 {
-public:
     void Init(const FVoronoiVertexBuffer* VertexBuffer);
 };
 
@@ -83,6 +80,6 @@ public:
     virtual void GetDynamicMeshElements(const TArray<const FSceneView*>& Views, const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, FMeshElementCollector& Collector) const override;
     virtual FPrimitiveViewRelevance GetViewRelevance(const FSceneView* View) const override;
 
-    virtual uint32 GetMemoryFootprint(void) const override { return sizeof(FVoronoiSceneProxy) + GetAllocatedSize(); }
-    uint32 GetAllocatedSize(void) const { return FPrimitiveSceneProxy::GetAllocatedSize(); }
+    virtual uint32 GetMemoryFootprint() const override { return sizeof(FVoronoiSceneProxy) + GetAllocatedSize(); }
+    uint32 GetAllocatedSize() const { return FPrimitiveSceneProxy::GetAllocatedSize(); }
 };

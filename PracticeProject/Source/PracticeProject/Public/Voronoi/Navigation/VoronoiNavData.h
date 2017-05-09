@@ -20,15 +20,35 @@ struct PRACTICEPROJECT_API FVoronoiGenerationOptions
     GENERATED_USTRUCT_BODY()
 
     /** Indicates precision used to voxelize geometry */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "10.0", ClampMax = "100.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "20.0", ClampMax = "40.0"))
     float CellSize;
 
+    /** Indicates radius of navigation agent */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "20.0", ClampMax = "80.0"))
+    float AgentRadius;
+
+    /** Indicates height of navigation agent */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "100.0", ClampMax = "200.0"))
+    float AgentHeight;
+
+    /** Indicates crouched height of navigation agent */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "100.0", ClampMax = "200.0"))
+    float AgentCrouchedHeight;
+
+    /** Indicates step height of navigation agent */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "50.0"))
+    float AgentStepHeight;
+
+    /** Indicates walkable slope of navigation agent */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "60.0"))
+    float AgentWalkableSlope;
+
     /** Indicates space between navigable area border and obstacle */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "100.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "50.0"))
     float BorderIndent;
 
     /** Indicates precision used to interpolate borders */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "100.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "40.0"))
     float MaxBorderDeviation;
 
     /** Indicates density of Voronoi sites */
@@ -40,11 +60,12 @@ struct PRACTICEPROJECT_API FVoronoiGenerationOptions
     float LinksSearchRadius;
 
     /** Indicates whether to draw surfaces */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "10000.0"))
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "5000.0"))
     float VisibilityRadius;
 
     FORCEINLINE FVoronoiGenerationOptions()
-        : CellSize(20.f), BorderIndent(0.f), MaxBorderDeviation(20.f), SitesPerSquareMeter(0.5f), LinksSearchRadius(500.f), VisibilityRadius(2000.f) {}
+        : CellSize(20.f), AgentRadius(42.f), AgentHeight(192.f), AgentCrouchedHeight(128.f), AgentStepHeight(35.f), AgentWalkableSlope(45.f)
+        , BorderIndent(0.f), MaxBorderDeviation(25.f), SitesPerSquareMeter(0.4f), LinksSearchRadius(500.f), VisibilityRadius(2000.f) {}
 };
 
 /** Drawing modes */
@@ -99,7 +120,7 @@ struct PRACTICEPROJECT_API FVoronoiDrawingOptions
 };
 
 /** Navigation based on the use of Voronoi diagrams */
-UCLASS(HideCategories = (Input, Rendering, Actor, Runtime, Transform), NotPlaceable)
+UCLASS(HideCategories = (Input, Rendering, Actor, Transform), NotPlaceable)
 class PRACTICEPROJECT_API AVoronoiNavData : public ANavigationData, public IVoronoiQuerier
 {
     GENERATED_BODY()
@@ -107,6 +128,10 @@ class PRACTICEPROJECT_API AVoronoiNavData : public ANavigationData, public IVoro
     /** Fallback values if an object making query is not IVoronoiQuerier */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Voronoi, meta = (AllowPrivateAccess = "true"))
     FVoronoiQuerierParameters VoronoiQuerierDefaults;
+
+    /** Indicates heuristics scale used in pathfinding */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Voronoi, meta = (ClampMin = "0.1", ClampMax = "10.0", AllowPrivateAccess = "true"))
+    float HeuristicsScale;
 
     /** Indicates the way Voronoi navigation mesh is generated  */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Generation, meta = (AllowPrivateAccess = "true"))
@@ -116,7 +141,7 @@ class PRACTICEPROJECT_API AVoronoiNavData : public ANavigationData, public IVoro
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Display, meta = (AllowPrivateAccess = "true"))
     FVoronoiDrawingOptions DrawingOptions;
 
-    bool bShowNavigation = false;
+    bool bShowNavigation, bSkipInitialRebuild;
     TUniquePtr<FVoronoiGraph> VoronoiGraph;
 
 	FORCEINLINE void CheckVoronoiGraph() const
@@ -147,17 +172,17 @@ public:
     virtual bool ProjectPoint(const FVector& Point, FNavLocation& OutLocation, const FVector& Extent, FSharedConstNavQueryFilter Filter = NULL, const UObject* Querier = NULL) const override;
     virtual bool DoesNodeContainLocation(NavNodeRef NodeRef, const FVector& WorldSpaceLocation) const override { return false; }
 
-    // -----------------------------------
+    // -------------------------------------------------------------------------------------------------------
     // PATH COST AND LENGTH CALCULATIONS
-    // -----------------------------------
+    // -------------------------------------------------------------------------------------------------------
 
     virtual ENavigationQueryResult::Type CalcPathCost(const FVector& PathStart, const FVector& PathEnd, float& OutPathCost, FSharedConstNavQueryFilter QueryFilter = NULL, const UObject* Querier = NULL) const override;
     virtual ENavigationQueryResult::Type CalcPathLength(const FVector& PathStart, const FVector& PathEnd, float& OutPathLength, FSharedConstNavQueryFilter QueryFilter = NULL, const UObject* Querier = NULL) const override;
     virtual ENavigationQueryResult::Type CalcPathLengthAndCost(const FVector& PathStart, const FVector& PathEnd, float& OutPathLength, float& OutPathCost, FSharedConstNavQueryFilter QueryFilter = NULL, const UObject* Querier = NULL) const override;
 
-    // ----------------------------------
+    // -------------------------------------------------------------------------------------------------------
     // RANDOM POINTS GETTERS
-    // ----------------------------------
+    // -------------------------------------------------------------------------------------------------------
 
 	static FNavLocation GetRandomPointInFace(const FVoronoiFace* Face);
 	static FNavLocation GetRandomPointInFaces(const TArray<const FVoronoiFace*> &Faces);
@@ -166,18 +191,18 @@ public:
     virtual bool GetRandomReachablePointInRadius(const FVector& Origin, float Radius, FNavLocation& OutResult, FSharedConstNavQueryFilter Filter = NULL, const UObject* Querier = NULL) const override;
     virtual bool GetRandomPointInNavigableRadius(const FVector& Origin, float Radius, FNavLocation& OutResult, FSharedConstNavQueryFilter Filter = NULL, const UObject* Querier = NULL) const override;
     
-    // ----------------------------------
+    // -------------------------------------------------------------------------------------------------------
     // EMPTY FUNCTIONS
-    // ----------------------------------
+    // -------------------------------------------------------------------------------------------------------
 
     virtual void BatchRaycast(TArray<FNavigationRaycastWork>& Workload, FSharedConstNavQueryFilter QueryFilter, const UObject* Querier = NULL) const override {};
     virtual void BatchProjectPoints(TArray<FNavigationProjectionWork>& Workload, const FVector& Extent, FSharedConstNavQueryFilter Filter = NULL, const UObject* Querier = NULL) const override {};
     virtual void OnNavAreaAdded(const UClass* NavAreaClass, int32 AgentIndex) override {}
     virtual void OnNavAreaRemoved(const UClass* NavAreaClass) override {};
 
-    // ----------------------------------
+    // -------------------------------------------------------------------------------------------------------
     // IMPLEMENTATIONS
-    // ----------------------------------
+    // -------------------------------------------------------------------------------------------------------
 
     static FPathFindingResult FindPathVoronoi(const FNavAgentProperties& AgentProperties, const FPathFindingQuery& Query);
     static bool TestPathVoronoi(const FNavAgentProperties& AgentProperties, const FPathFindingQuery& Query, int32* NumVisitedNodes);
@@ -187,10 +212,13 @@ public:
     /** Calculate cost of travel between two faces. If returned value is negative then there is no way */
     static float Distance(const IVoronoiQuerier* Querier, const FVoronoiFace *Zeroth, const FVoronoiFace *First, const FVoronoiFace *Second, bool bJumpRequired);
 
-    // ----------------------------------
+    // -------------------------------------------------------------------------------------------------------
     // NOT VIRTUAL FUNCIONS
-    // ----------------------------------
-    
+    // -------------------------------------------------------------------------------------------------------
+
+    FORCEINLINE bool ShouldSkipInitialRebuild() const { return bSkipInitialRebuild; }
+    FORCEINLINE void OnInitialRebuildSkipped() { bSkipInitialRebuild = false; }
+
     void OnVoronoiNavDataGenerationFinished();
 
     const FVoronoiFace* GetFaceByPoint(const FVector& Point, bool bProjectPoint = true) const;
@@ -205,15 +233,15 @@ public:
 			RenderingComp->MarkRenderStateDirty();
 	}
 
-    // -----------------------------------
+    // -------------------------------------------------------------------------------------------------------
     // IVoronoiQuerier interface
-    // -----------------------------------
+    // -------------------------------------------------------------------------------------------------------
 
     virtual const FVoronoiQuerierParameters& GetVoronoiQuerierParameters() const override { return VoronoiQuerierDefaults; }
 
-    // -----------------------------------
+    // -------------------------------------------------------------------------------------------------------
     // BLUEPRINTS
-    // -----------------------------------
+    // -------------------------------------------------------------------------------------------------------
 
     /**
     * Retrieves AVoronoiNavData from Navigation System
@@ -222,13 +250,14 @@ public:
     UFUNCTION(BlueprintPure, Category = VoronoiPropertiesManager, meta = (WorldContext = "WorldContextObject"))
     static AVoronoiNavData* GetVoronoiNavData(const UObject* WorldContextObject);
 
-    // -----------------------------------
+    // -------------------------------------------------------------------------------------------------------
     // GET FUNCTIONS
-    // -----------------------------------
+    // -------------------------------------------------------------------------------------------------------
 
     FORCEINLINE const FVoronoiGenerationOptions& GetGenerationOptions() const { return GenerationOptions; }
     FORCEINLINE const FVoronoiDrawingOptions& GetDrawingOptions() const { return DrawingOptions; }
 
+    FORCEINLINE float GetHeuristicsScale() const { return HeuristicsScale; }
     FORCEINLINE FVoronoiGraph* GetVoronoiGraph() const { CheckVoronoiGraph(); return VoronoiGraph.Get(); }
 };
 

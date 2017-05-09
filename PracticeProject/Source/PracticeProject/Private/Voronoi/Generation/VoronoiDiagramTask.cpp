@@ -185,7 +185,7 @@ void FVoronoiDiagramTask::DoWork()
             return;
 
         TUniquePtr<FEvent> Event = MoveTemp(EventQueue.HeapTop());
-        EventQueue.HeapRemoveAt(0);
+        EventQueue.HeapRemoveAt(0, false);
 
         if (!Event->IsValid)
             continue;
@@ -492,7 +492,7 @@ void FVoronoiDiagramTask::DoWork()
                     if (IntersectingEdges[p].Edge->RightFace == IntersectingEdges[0].Edge->LeftFace)
                     {
                         FVoronoiEdgeIntersect Temp = IntersectingEdges[p];
-                        IntersectingEdges.RemoveAtSwap(p);
+                        IntersectingEdges.RemoveAtSwap(p, 1, false);
                         IntersectingEdges.Insert(Temp, 0);
                         break;
                     }
@@ -654,9 +654,9 @@ void FVoronoiDiagramTask::DoWork()
         }
     }
     
-    for (int32 i = 0; i < VoronoiSurface->Faces.Num(); ++i)    if (!VisitedFaces.Contains(VoronoiSurface->Faces[i]))       VoronoiSurface->Faces.RemoveAtSwap(i--);
-    for (int32 i = 0; i < VoronoiSurface->Edges.Num(); ++i)    if (!VisitedEdges.Contains(VoronoiSurface->Edges[i]))       VoronoiSurface->Edges.RemoveAtSwap(i--);
-    for (int32 i = 0; i < VoronoiSurface->Vertexes.Num(); ++i) if (!VisitedVertexes.Contains(VoronoiSurface->Vertexes[i])) VoronoiSurface->Vertexes.RemoveAtSwap(i--);
+    for (int32 i = 0; i < VoronoiSurface->Faces.Num(); ++i)    if (!VisitedFaces.Contains(VoronoiSurface->Faces[i]))       VoronoiSurface->Faces.RemoveAtSwap(i--, 1, false);
+    for (int32 i = 0; i < VoronoiSurface->Edges.Num(); ++i)    if (!VisitedEdges.Contains(VoronoiSurface->Edges[i]))       VoronoiSurface->Edges.RemoveAtSwap(i--, 1, false);
+    for (int32 i = 0; i < VoronoiSurface->Vertexes.Num(); ++i) if (!VisitedVertexes.Contains(VoronoiSurface->Vertexes[i])) VoronoiSurface->Vertexes.RemoveAtSwap(i--, 1, false);
 
     // -------------------------------------------------------------------------------------------------------
     // SPLIT CONCAVE FACES INTO CONVEX ONES
@@ -768,7 +768,7 @@ void FVoronoiDiagramTask::DoWork()
     const float JumpZVelocity = 450;
     const float Gravity = FMath::Abs(World->GetGravityZ());
 
-    const FVector AgentFullHeight(0, 0, AgentProperties.AgentHeight);
+    const FVector AgentFullHeight(0, 0, GenerationOptions.AgentHeight);
     const FVector AgentJumpFullHeight = AgentFullHeight + FVector(0, 0, JumpZVelocity * JumpZVelocity / 2 / Gravity);
 
     for (TPreserveConstUniquePtr<FVoronoiVertex>& Vertex : VoronoiSurface->Vertexes)

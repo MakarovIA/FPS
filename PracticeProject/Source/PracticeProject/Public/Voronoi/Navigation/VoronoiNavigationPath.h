@@ -14,8 +14,11 @@ struct PRACTICEPROJECT_API FVoronoiNavigationPath : public FNavigationPath
     TSet<const FVoronoiFace*> JumpPositions;
     TArray<const FVoronoiFace*> PathFaces;
 
-    FVoronoiNavigationPath();
-    void AddPathPoint(const FVoronoiFace *InFace, const FVector& InLocation);
+    FORCEINLINE FVoronoiNavigationPath()
+    {
+        PathType = FVoronoiNavigationPath::Type;
+    }
 
+    void AddPathPoint(const FVoronoiFace *InFace, const FVector& InLocation, bool bIsJumpRequired);
     virtual float GetCostFromIndex(int32 PathPointIndex) const override;
 };

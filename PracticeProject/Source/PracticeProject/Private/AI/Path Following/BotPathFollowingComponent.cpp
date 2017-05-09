@@ -90,7 +90,7 @@ FVector UBotPathFollowingComponent::GetMoveFocus(bool bAllowStrafe) const
 
     if (bAllowStrafe && DestinationActor.IsValid())
         return DestinationActor->GetActorLocation();
-    else 
+    else
         if (MovementComp != nullptr)
             return MovementComp->GetActorLocation() + (CurrentMoveDirection * 20.0f);
 

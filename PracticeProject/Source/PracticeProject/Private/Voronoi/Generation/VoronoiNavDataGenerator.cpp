@@ -15,10 +15,9 @@ bool FVoronoiNavDataGenerator::RebuildAll()
     CancelBuild();
 
     VoronoiNavData->VoronoiGraph->GeneratedSurfaces.Empty();
-    GenerationStartTime = FPlatformTime::Seconds();
-
     GenerationOptions = VoronoiNavData->GetGenerationOptions();
-    AgentProperties = VoronoiNavData->GetConfig();
+
+    GenerationStartTime = FPlatformTime::Seconds();
 
     // ------------------------------------------------------------------------------------
     // COLLECT NAVIGATION BOUNDING BOXES
@@ -72,7 +71,7 @@ bool FVoronoiNavDataGenerator::RebuildAll()
             if (Overlap.Max.Z < InclusionBounds[j].Max.Z)
                 InclusionBounds.Emplace(FVector(Overlap.Min.X, Overlap.Min.Y, Overlap.Max.Z), FVector(Overlap.Max.X, Overlap.Max.Y, InclusionBounds[j].Max.Z));
 
-            InclusionBounds.RemoveAt(j--);
+            InclusionBounds.RemoveAt(j--, 1, false);
         }
     }
 
@@ -116,7 +115,7 @@ void FVoronoiNavDataGenerator::EnsureBuildCompletion()
             VoronoiGeometryTasks[i]->EnsureCompletion();
 
         GeometryToSurface();
-        VoronoiGeometryTasks.Empty();
+        VoronoiGeometryTasks.Reset();
     }
 
     if (VoronoiSurfaceTask.IsValid())
@@ -133,7 +132,7 @@ void FVoronoiNavDataGenerator::EnsureBuildCompletion()
             VoronoiDiagramTasks[i]->EnsureCompletion();
 
         DiagramToProperties();
-        VoronoiDiagramTasks.Empty();
+        VoronoiDiagramTasks.Reset();
     }
 
     if (VoronoiPropertiesTask.IsValid())
@@ -151,7 +150,7 @@ void FVoronoiNavDataGenerator::CancelBuild()
 
     for (int32 i = 0, sz = VoronoiGeometryTasks.Num(); i < sz; ++i)
         VoronoiGeometryTasks[i]->EnsureCompletion();
-    VoronoiGeometryTasks.Empty();
+    VoronoiGeometryTasks.Reset();
 
     if (VoronoiSurfaceTask.IsValid())
     {
@@ -161,7 +160,7 @@ void FVoronoiNavDataGenerator::CancelBuild()
 
     for (int32 i = 0, sz = VoronoiDiagramTasks.Num(); i < sz; ++i)
         VoronoiDiagramTasks[i]->EnsureCompletion();
-    VoronoiDiagramTasks.Empty();
+    VoronoiDiagramTasks.Reset();
 
     if (VoronoiPropertiesTask.IsValid())
     {
@@ -190,7 +189,7 @@ void FVoronoiNavDataGenerator::TickAsyncBuild(float DeltaSeconds)
         if (CompletedTasks == VoronoiGeometryTasks.Num())
         {
             GeometryToSurface();
-            VoronoiGeometryTasks.Empty();
+            VoronoiGeometryTasks.Reset();
         }
     }
 
@@ -209,7 +208,7 @@ void FVoronoiNavDataGenerator::TickAsyncBuild(float DeltaSeconds)
         if (CompletedTasks == VoronoiDiagramTasks.Num())
         {
             DiagramToProperties();
-            VoronoiDiagramTasks.Empty();
+            VoronoiDiagramTasks.Reset();
         }
     }
 
@@ -227,7 +226,13 @@ void FVoronoiNavDataGenerator::TickAsyncBuild(float DeltaSeconds)
 
 void FVoronoiNavDataGenerator::RebuildDirtyAreas(const TArray<FNavigationDirtyArea>& DirtyAreas)
 {
-    if (DirtyAreas.ContainsByPredicate([](const FNavigationDirtyArea& Area) { return Area.HasFlag(ENavigationDirtyFlag::Geometry) || Area.HasFlag(ENavigationDirtyFlag::NavigationBounds); }))
+    if (VoronoiNavData->ShouldSkipInitialRebuild())
+    {
+        VoronoiNavData->OnInitialRebuildSkipped();
+        return;
+    }
+
+    if (DirtyAreas.ContainsByPredicate([](const FNavigationDirtyArea& Area) -> bool { return Area.HasFlag(ENavigationDirtyFlag::All); }))
         RebuildAll();
 }
 
@@ -249,9 +254,8 @@ void FVoronoiNavDataGenerator::GeometryToSurface()
 {
     UE_LOG(LogNavigation, Log, TEXT("Voronoi geometry collection finished in %d ms"), (int32)((FPlatformTime::Seconds() - GenerationStartTime) * 1000));
 
-    const FVector TotalBBSize = TotalBounds.GetSize();
-    const int32 TotalBBSizeX = FMath::RoundToInt(TotalBBSize.X / GenerationOptions.CellSize);
-    const int32 TotalBBSizeY = FMath::RoundToInt(TotalBBSize.Y / GenerationOptions.CellSize);
+    const FVector TotalBBSize = TotalBounds.GetSize() / GenerationOptions.CellSize;
+    const int32 TotalBBSizeX = FMath::RoundToInt(TotalBBSize.X), TotalBBSizeY = FMath::RoundToInt(TotalBBSize.Y);
 
     TArray<TArray<float>> ProfileTemp;
     TArray<TArray<TArray<float>>> GlobalHeightField;
@@ -263,20 +267,15 @@ void FVoronoiNavDataGenerator::GeometryToSurface()
     {
         FVoronoiGeometryTask &Task = VoronoiGeometryTasks[k]->GetTask();
 
-        const FVector TileBBSize = Task.TileBB.GetSize();
-        const int32 TileBBSizeX = FMath::RoundToInt(TileBBSize.X / GenerationOptions.CellSize);
-        const int32 TileBBSizeY = FMath::RoundToInt(TileBBSize.Y / GenerationOptions.CellSize);
+        const FVector TileBBSize = Task.TileBB.GetSize() / GenerationOptions.CellSize;
+        const FVector HeightFieldOffset = (Task.TileBB.Min - TotalBounds.Min) / GenerationOptions.CellSize;
 
-        const FVector HeightFieldOffset = Task.TileBB.Min - TotalBounds.Min;
-        const int32 GlobalX = FMath::RoundToInt(HeightFieldOffset.X / GenerationOptions.CellSize);
-        const int32 GlobalY = FMath::RoundToInt(HeightFieldOffset.Y / GenerationOptions.CellSize);
+        const int32 TileBBSizeX = FMath::RoundToInt(TileBBSize.X), TileBBSizeY = FMath::RoundToInt(TileBBSize.Y);
+        const int32 GlobalX = FMath::RoundToInt(HeightFieldOffset.X), GlobalY = FMath::RoundToInt(HeightFieldOffset.Y);
 
         for (int32 i = 0; i < TileBBSizeX; ++i)
             for (int32 j = 0; j < TileBBSizeY; ++j)
-                if (GlobalHeightField[GlobalX + i][GlobalY + j].Num() == 0)
-                    GlobalHeightField[GlobalX + i][GlobalY + j] = MoveTemp(Task.CompressedHeightField[i][j]);
-                else
-                    GlobalHeightField[GlobalX + i][GlobalY + j].Append(MoveTemp(Task.CompressedHeightField[i][j]));
+                GlobalHeightField[GlobalX + i][GlobalY + j].Append(MoveTemp(Task.CompressedHeightField[i][j]));
     }
 
     VoronoiSurfaceTask = MakeUnique<FAsyncTask<FVoronoiSurfaceTask>>(*this, MoveTemp(GlobalHeightField), TotalBounds.Min);
@@ -300,7 +299,7 @@ void FVoronoiNavDataGenerator::SurfaceToDiagram()
         {
             const int32 ChosenCell = FMath::RandRange(0, Task.Surfaces[i].Num() - 1);
             VoronoiNavData->VoronoiGraph->GeneratedSurfaces[i]->Faces.Add(MakeUnique<FVoronoiFace>(VoronoiNavData->VoronoiGraph->GeneratedSurfaces[i], Task.Surfaces[i][ChosenCell]));
-            Task.Surfaces[i].RemoveAtSwap(ChosenCell);
+            Task.Surfaces[i].RemoveAtSwap(ChosenCell, 1, false);
         }
 
         for (int32 j = 0, N = Task.SurfaceBorders[i].Num(); j < N; ++j)
@@ -320,15 +319,9 @@ void FVoronoiNavDataGenerator::DiagramToProperties()
     UE_LOG(LogNavigation, Log, TEXT("Voronoi diagrams generation finished in %d ms"), (int32)((FPlatformTime::Seconds() - GenerationStartTime) * 1000));
 
 #ifdef WITH_EDITOR
-    for (TPreserveConstUniquePtr<FVoronoiSurface>& Surface : VoronoiNavData->VoronoiGraph->GeneratedSurfaces)
-        for (TPreserveConstUniquePtr<FVoronoiFace>& Face : Surface->Faces)
-            if (FVoronoiFace *OldFace = VoronoiNavData->GetFaceByPoint(Face->Location, false))
-                Face->TacticalProperties = OldFace->TacticalProperties;
-
     VoronoiNavData->VoronoiGraph->bCanRenderGenerated = true;
 #endif // WITH_EDITOR
 
-    // Continue links and properties calculation
     VoronoiPropertiesTask = MakeUnique<FAsyncTask<FVoronoiPropertiesTask>>(*this, &VoronoiNavData->VoronoiGraph->GeneratedSurfaces);
     VoronoiPropertiesTask->StartBackgroundTask();
 }

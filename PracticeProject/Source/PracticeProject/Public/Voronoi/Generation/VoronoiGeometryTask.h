@@ -8,7 +8,6 @@
 class PRACTICEPROJECT_API FVoronoiGeometryTask final : public FVoronoiTask
 {
     TArray<TSharedRef<FNavigationRelevantData, ESPMode::ThreadSafe>> NavigationRelevantData;
-    void AppendGeometry(const FNavigationRelevantData& ElementData, TArray<struct FVoronoiGeometryElement> &Geometry);
 
 public:
     TArray<TArray<TArray<float>>> CompressedHeightField;

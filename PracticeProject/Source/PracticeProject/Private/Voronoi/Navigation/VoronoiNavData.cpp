@@ -9,6 +9,7 @@
 /** AVoronoiNavData */
 
 AVoronoiNavData::AVoronoiNavData()
+    : HeuristicsScale(.999f), bShowNavigation(false), bSkipInitialRebuild(false)
 {
     if (!HasAnyFlags(RF_ClassDefaultObject))
     {
@@ -46,7 +47,8 @@ void AVoronoiNavData::Serialize(FArchive &Ar)
     if (!VoronoiGraph.IsValid())
         VoronoiGraph = MakeUnique<FVoronoiGraph>();
 
-    VoronoiGraph->Serialize(Ar);
+    const bool bSerializationSuccess = VoronoiGraph->Serialize(Ar);
+    bSkipInitialRebuild = Ar.IsLoading() ? bSerializationSuccess : bSkipInitialRebuild;
 }
 
 UPrimitiveComponent* AVoronoiNavData::ConstructRenderingComponent()
@@ -106,22 +108,22 @@ ENavigationQueryResult::Type AVoronoiNavData::CalcPathLengthAndCost(const FVecto
 FNavLocation AVoronoiNavData::GetRandomPointInFace(const FVoronoiFace* Face)
 {
 	TArray<FVector> Points;
-	for (const FVoronoiVertex* i : FVoronoiHelper::GetAdjacentVertexes(Face))
-		Points.Add(i->Location);
+	for (const FVoronoiVertex* Vertex : FVoronoiHelper::GetAdjacentVertexes(Face))
+		Points.Add(Vertex->Location);
 
 	return FNavLocation(FMathExtended::GetRandomPointInPolygon(Points));
 }
 FNavLocation AVoronoiNavData::GetRandomPointInFaces(const TArray<const FVoronoiFace*> &Faces)
 {
 	float TotalArea = 0;
-	for (const FVoronoiFace* i : Faces)
-		TotalArea += i->TacticalProperties.Area;
+	for (const FVoronoiFace* Face : Faces)
+		TotalArea += Face->TacticalProperties.Area;
 
 	float ChosenArea = FMath::FRandRange(0, TotalArea);
 
-	for (const FVoronoiFace* i : Faces)
-		if ((ChosenArea -= i->TacticalProperties.Area) < 0)
-			return GetRandomPointInFace(i);
+	for (const FVoronoiFace* Face : Faces)
+		if ((ChosenArea -= Face->TacticalProperties.Area) < 0)
+			return GetRandomPointInFace(Face);
 
 	return FNavLocation();
 }
@@ -140,15 +142,19 @@ bool AVoronoiNavData::GetRandomReachablePointInRadius(const FVector& Origin, flo
 {
     CheckVoronoiGraph();
 
-    OutResult = GetRandomPointInFaces(GetReachableFacesInRadius(Origin, Radius));
-    return true;
+    TArray<const FVoronoiFace*> Faces = GetReachableFacesInRadius(Origin, Radius);
+    OutResult = GetRandomPointInFaces(Faces);
+
+    return Faces.Num() != 0;
 }
 bool AVoronoiNavData::GetRandomPointInNavigableRadius(const FVector& Origin, float Radius, FNavLocation& OutResult, FSharedConstNavQueryFilter Filter, const UObject* Querier) const
 {
     CheckVoronoiGraph();
 
-	OutResult = GetRandomPointInFaces(GetFacesInRadius(Origin, Radius));
-	return true;
+    TArray<const FVoronoiFace*> Faces = GetFacesInRadius(Origin, Radius);
+    OutResult = GetRandomPointInFaces(Faces);
+
+    return Faces.Num() != 0;
 }
 
 // IMPLEMENTATIONS
@@ -167,17 +173,12 @@ FPathFindingResult AVoronoiNavData::FindPathVoronoi(const FNavAgentProperties& A
         FORCEINLINE bool operator<(const FAStarNode &Right) const { return Weight + Heuristics < Right.Weight + Right.Heuristics; }
     };
 
-    static float(*HeuristicsFunc)(const FVoronoiFace *InFace, const FVector &InEnd) =
-        [](const FVoronoiFace *InFace, const FVector &InEnd) -> float { return FVector::Dist(InFace->Location, InEnd); };
+    const AVoronoiNavData* Self = static_cast<const AVoronoiNavData*>(Query.NavData.Get()); Self->CheckVoronoiGraph();
+    FVoronoiNavPathPtr VoronoiPath = StaticCastSharedPtr<FVoronoiNavigationPath>(Self->CreatePathInstance<FVoronoiNavigationPath>(Query));
 
-    const AVoronoiNavData* Self = static_cast<const AVoronoiNavData*>(Query.NavData.Get());
-    Self->CheckVoronoiGraph();
-
-    FVoronoiNavPathPtr VoronoiPath = StaticCastSharedPtr<FVoronoiNavigationPath>(
-		Query.PathInstanceToFill.IsValid() ? Query.PathInstanceToFill : Self->CreatePathInstance<FVoronoiNavigationPath>(Query));
-
-    VoronoiPath->GetPathPoints().Reset();
-    VoronoiPath->JumpPositions.Reset();
+    const IVoronoiQuerier* VoronoiQuerier = Cast<const IVoronoiQuerier>(Query.Owner.Get());
+    if (VoronoiQuerier == nullptr || !VoronoiQuerier->IsVoronoiQuerier())
+        VoronoiQuerier = Self;
 
     const FVoronoiFace *FirstVoronoi = Self->GetFaceByPoint(Query.StartLocation);
     const FVoronoiFace *LastVoronoi = Self->GetFaceByPoint(Query.EndLocation);
@@ -185,26 +186,19 @@ FPathFindingResult AVoronoiNavData::FindPathVoronoi(const FNavAgentProperties& A
     if (FirstVoronoi == nullptr || LastVoronoi == nullptr)
         return ENavigationQueryResult::Fail;
 
-    if (FirstVoronoi == LastVoronoi)
-        return ENavigationQueryResult::Success;
-
-    const IVoronoiQuerier* VoronoiQuerier = Cast<const IVoronoiQuerier>(Query.Owner.Get());
-    if (VoronoiQuerier == nullptr || !VoronoiQuerier->IsVoronoiQuerier())
-        VoronoiQuerier = Self;
-
-    VoronoiPath->AddPathPoint(FirstVoronoi, Query.StartLocation);
+    VoronoiPath->AddPathPoint(FirstVoronoi, Query.StartLocation, false);
 
     TSet<const FVoronoiFace*> Visited;
     TSet<const FVoronoiFace*> JumpRequired;
     TMap<const FVoronoiFace*, const FVoronoiFace*> Previous;
 
     TArray<FAStarNode> Queue;
-    Queue.HeapPush(FAStarNode(nullptr, FirstVoronoi, 0, HeuristicsFunc(FirstVoronoi, Query.EndLocation), false));
+    Queue.HeapPush(FAStarNode(nullptr, FirstVoronoi, 0, FVector::Dist(FirstVoronoi->Location, Query.EndLocation) * Self->GetHeuristicsScale(), false));
 
     while (Queue.Num() > 0)
     {
         FAStarNode Top = Queue.HeapTop();
-        Queue.HeapRemoveAt(0);
+        Queue.HeapRemoveAt(0, false);
 
         bool AlreadyVisited;
         if (Visited.Add(Top.Current, &AlreadyVisited), AlreadyVisited)
@@ -217,13 +211,13 @@ FPathFindingResult AVoronoiNavData::FindPathVoronoi(const FNavAgentProperties& A
             break;
 
         TArray<FVoronoiLink> LinkedFaces(Top.Current->Links);
-        for (const FVoronoiFace* i : FVoronoiHelper::GetAdjacentFaces(Top.Current))
-            LinkedFaces.Emplace(i, false);
+        for (const FVoronoiFace* Face : FVoronoiHelper::GetAdjacentFaces(Top.Current))
+            LinkedFaces.Emplace(Face, false);
 
         float Distance;
         for (const FVoronoiLink& Link : LinkedFaces)
             if (!Visited.Contains(Link.Face) && (Distance = Self->Distance(VoronoiQuerier, Top.Previous, Top.Current, Link.Face, Top.bJumpRequired)) > 0)
-                Queue.HeapPush(FAStarNode(Top.Current, Link.Face, Top.Weight + Distance, HeuristicsFunc(Link.Face, Query.EndLocation), Link.bJumpRequired));
+                Queue.HeapPush(FAStarNode(Top.Current, Link.Face, Top.Weight + Distance, FVector::Dist(Link.Face->Location, Query.EndLocation) * Self->GetHeuristicsScale(), Link.bJumpRequired != 0));
     }
 
     if (!Previous.Contains(LastVoronoi))
@@ -234,9 +228,9 @@ FPathFindingResult AVoronoiNavData::FindPathVoronoi(const FNavAgentProperties& A
         VoronoiPath->SetIsPartial(true);
 
         float Best = FLT_MAX, Temp;
-        for (const FVoronoiFace *i : Visited)
-            if ((Temp = HeuristicsFunc(i, Query.EndLocation)) < Best)
-                LastVoronoi = i, Best = Temp;
+        for (const FVoronoiFace *Face : Visited)
+            if ((Temp = FVector::DistSquared(Face->Location, Query.EndLocation)) < Best)
+                LastVoronoi = Face, Best = Temp;
     }
 
     TArray<const FVoronoiFace*> InversePath;
@@ -267,12 +261,10 @@ FPathFindingResult AVoronoiNavData::FindPathVoronoi(const FNavAgentProperties& A
             Location = FVector((FirstPoint * FirstWeight + SecondPoint * SecondWeight) / (FirstWeight + SecondWeight), InversePath[i]->Location.Z);
         }
 
-        if (JumpRequired.Contains(InversePath[i]))
-            VoronoiPath->JumpPositions.Add(VoronoiPath->PathFaces.Last());
-        VoronoiPath->AddPathPoint(InversePath[i], Location);
+        VoronoiPath->AddPathPoint(InversePath[i], Location, JumpRequired.Contains(InversePath[i]));
     }
 
-    VoronoiPath->AddPathPoint(LastVoronoi, VoronoiPath->IsPartial() ? LastVoronoi->Location : Query.EndLocation);
+    VoronoiPath->AddPathPoint(LastVoronoi, VoronoiPath->IsPartial() ? LastVoronoi->Location : Query.EndLocation, false);
     VoronoiPath->MarkReady();
 
 	FPathFindingResult Result(ENavigationQueryResult::Success);
@@ -337,7 +329,7 @@ const FVoronoiFace* AVoronoiNavData::GetFaceByPoint(const FVector& Point, bool b
 	const FVoronoiFace* Answer = nullptr;
 	for (const TPreserveConstUniquePtr<FVoronoiSurface>& Surface : VoronoiGraph->Surfaces)
 		if (const FVoronoiFace *Candidate = Surface->QuadTree->GetFaceByPoint(FVector2D(Point)))
-			if (Candidate->Location.Z >= PointZ && (Answer == nullptr || Answer->Location.Z > Candidate->Location.Z))
+			if (FMath::Abs(Candidate->Location.Z - PointZ) < 100.f && (Answer == nullptr || Answer->Location.Z > Candidate->Location.Z))
 				Answer = Candidate;
 
     return Answer;
@@ -352,7 +344,7 @@ FVoronoiFace* AVoronoiNavData::GetFaceByPoint(const FVector& Point, bool bProjec
     FVoronoiFace* Answer = nullptr;
     for (TPreserveConstUniquePtr<FVoronoiSurface>& Surface : VoronoiGraph->Surfaces)
         if (FVoronoiFace *Candidate = Surface->QuadTree->GetFaceByPoint(FVector2D(Point)))
-            if (Candidate->Location.Z >= PointZ && (Answer == nullptr || Answer->Location.Z > Candidate->Location.Z))
+            if (FMath::Abs(Candidate->Location.Z - PointZ) < 100.f && (Answer == nullptr || Answer->Location.Z > Candidate->Location.Z))
                 Answer = Candidate;
 
     return Answer;
@@ -385,8 +377,8 @@ TArray<const FVoronoiFace*> AVoronoiNavData::GetReachableFacesInRadius(const FVe
         Visited.Add(Top);
 
         TArray<FVoronoiLink> LinkedFaces(Top->Links);
-        for (const FVoronoiFace* Adj : FVoronoiHelper::GetAdjacentFaces(Top))
-            LinkedFaces.Emplace(Adj, false);
+        for (const FVoronoiFace* Face : FVoronoiHelper::GetAdjacentFaces(Top))
+            LinkedFaces.Emplace(Face, false);
 
         for (const FVoronoiLink& Link : LinkedFaces)
             if (!Visited.Contains(Link.Face))
@@ -394,9 +386,9 @@ TArray<const FVoronoiFace*> AVoronoiNavData::GetReachableFacesInRadius(const FVe
     }
 
     TArray<const FVoronoiFace*> Result;
-    for (const FVoronoiFace* i : Visited)
-        if (FVector2D::DistSquared(FVector2D(Origin), FVector2D(i->Location)) <= Radius * Radius)
-            Result.Add(i);
+    for (const FVoronoiFace* Face : Visited)
+        if (FVector::DistSquaredXY(Origin, Face->Location) <= Radius * Radius)
+            Result.Add(Face);
 
     return Result;
 }

@@ -82,12 +82,12 @@ const FVoronoiFace* FVoronoiQuadTree::GetFaceByPoint(const FVector2D& Point) con
 
 TArray<const FVoronoiFace*> FVoronoiQuadTree::GetFacesInCircle(const FVector2D& Point, float Radius) const
 {
-    return GetFacesByPredicate([&Point, &Radius](const FBox2D& InRect) -> bool
+    return GetFacesByPredicate([&Point, Radius](const FBox2D& InRect) -> bool
     {
         const float DistanceX = Point.X - FMath::Clamp(Point.X, InRect.Min.X, InRect.Max.X);
         const float DistanceY = Point.Y - FMath::Clamp(Point.Y, InRect.Min.Y, InRect.Max.Y);
 
-        return DistanceX * DistanceX + DistanceY * DistanceY < (Radius * Radius);
+        return DistanceX * DistanceX + DistanceY * DistanceY < Radius * Radius;
     });
 }
 
@@ -149,7 +149,7 @@ FVoronoiFace* FVoronoiQuadTree::GetFaceByPoint(const FVector2D& Point)
 
 TArray<FVoronoiFace*> FVoronoiQuadTree::GetFacesInCircle(const FVector2D& Point, float Radius)
 {
-    return GetFacesByPredicate([&Point, &Radius](const FBox2D& InRect) -> bool
+    return GetFacesByPredicate([&Point, Radius](const FBox2D& InRect) -> bool
     {
         const float DistanceX = Point.X - FMath::Clamp(Point.X, InRect.Min.X, InRect.Max.X);
         const float DistanceY = Point.Y - FMath::Clamp(Point.Y, InRect.Min.Y, InRect.Max.Y);
