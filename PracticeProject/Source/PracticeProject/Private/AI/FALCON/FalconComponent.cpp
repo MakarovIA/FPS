@@ -12,10 +12,10 @@ UFalconComponent::UFalconComponent()
 
 	PrimaryComponentTick.bCanEverTick = true;
 
-	myFALCON = new NEWFALCON(numStates * 2, 4, 0.9f, 0.1f, 20, "C:\\Users\\Admin\\Downloads\\PracticeProject v2 4.13\\PracticeProject v2 4.13\\FALCON_data.txt",
-        "C:\\Users\\Admin\\Downloads\\PracticeProject v2 4.13\\PracticeProject v2 4.13\\FALCON_info.txt",
-        "C:\\Users\\Admin\\Downloads\\PracticeProject v2 4.13\\PracticeProject v2 4.13\\FALCON_stat.txt",
-        "C:\\Users\\Admin\\Downloads\\PracticeProject v2 4.13\\PracticeProject v2 4.13\\FALCON_data.txt");
+	myFALCON = new NEWFALCON(numStates * 2, 4, 0.9f, 0.1f, 20, "C:\\Users\\Admin\\Downloads\\11\\PracticeProject\\FALCON_data.txt",
+        "C:\\Users\\Admin\\Downloads\\11\\PracticeProject\\FALCON_info.txt",
+        "C:\\Users\\Admin\\Downloads\\11\\PracticeProject\\FALCON_stat.txt",
+        "C:\\Users\\Admin\\Downloads\\11\\PracticeProject\\FALCON_data.txt");
 	reward = 0;
 }
 

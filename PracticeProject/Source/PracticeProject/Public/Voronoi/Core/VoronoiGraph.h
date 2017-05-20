@@ -9,6 +9,10 @@
 #include "VoronoiQuadTree.h"
 #include "VoronoiHelper.h"
 
+#include <vector>
+#include <map>
+#include <algorithm>
+
 struct FVoronoiVertex;
 struct FVoronoiEdge;
 struct FVoronoiFace;
@@ -23,6 +27,27 @@ class FVoronoiRenderAttorney;
 struct PRACTICEPROJECT_API FVoronoiFlags final
 {
     uint8 bCrouchedOnly = false, bNoJump = false, bBorder = false;
+};
+
+UENUM(BlueprintType)
+enum class EStatisticKey : uint8
+{
+	SKT_Bots_1                    UMETA(DisplayName = "Bots type 1 statistics"),
+	SKT_Bots_2                    UMETA(DisplayName = "Bots type 2 statistics"),
+	SKT_Player                    UMETA(DisplayName = "Player statistics"),
+};
+
+
+/* public map statistcs */
+struct PRACTICEPROJECT_API FVoronoiFaceOnlineStatistics final {
+	std::map<EStatisticKey, double> deaths;
+	std::map<EStatisticKey, double> kills;
+	FVoronoiFaceOnlineStatistics() : deaths(), kills() {}
+};
+
+struct PRACTICEPROJECT_API FVoronoiStatisticJournal final {
+	std::vector<std::pair<FVector, EStatisticKey> > deaths;
+	std::vector<std::pair<FVector, EStatisticKey> > kills;
 };
 
 /** Tactics related properties Voronoi faces have */
@@ -92,9 +117,15 @@ struct PRACTICEPROJECT_API FVoronoiFace final
 
     FVoronoiTacticalProperties TacticalProperties;
 
+	/*Publicaly available statistics changing during game*/
+	FVoronoiFaceOnlineStatistics onlineStats;
+
     FORCEINLINE FVoronoiFace() {}
     FORCEINLINE FVoronoiFace(FVoronoiSurface *InSurface, const FVector &InLocation)
         : Location(InLocation), Surface(InSurface) {}
+
+	double getKills(EStatisticKey key) const;
+	double getDeaths(EStatisticKey key) const;
 
     FORCEINLINE bool Contains(const FVector2D &Point) const
     {
@@ -131,10 +162,18 @@ class PRACTICEPROJECT_API FVoronoiGraph final
     TArray<TPreserveConstUniquePtr<FVoronoiSurface>> GeneratedSurfaces, RenderedSurfaces;
     bool bCanRenderGenerated;
 
+	FVoronoiStatisticJournal journal;
+
     void SerializeInternal(FArchive &Ar);
 
     FVoronoiGraph& operator=(const FVoronoiGraph&) = delete;
     FVoronoiGraph(const FVoronoiGraph&) = delete;
+
+	TPreserveConstUniquePtr<FVoronoiFace>* GetNearestFaceToLoc(FVector location);
+	void addOnlineStatisticInFromOldGraph(const FVoronoiGraph * oldGraph);
+
+	// redistribute values between adjacent point A and point B using discrete diffusion equation
+	void diffusion(double &valueA, double& valueB, const double diffusion_coef);
 
     friend FVoronoiNavDataGenerator;
     friend FVoronoiRenderAttorney;
@@ -142,6 +181,11 @@ class PRACTICEPROJECT_API FVoronoiGraph final
 public:
     FORCEINLINE FVoronoiGraph()
         : bCanRenderGenerated(false) {}
+
+	void addKill(EStatisticKey entity, FVector location);
+	void addDeath(EStatisticKey entity, FVector location);
+
+	void diffuseStatistic(EStatisticKey key, const double diffuse_coef);
 
     TArray<TPreserveConstUniquePtr<FVoronoiSurface>> Surfaces;
     bool Serialize(FArchive &Ar);

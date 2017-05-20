@@ -10,6 +10,114 @@ FName FRIENDLY_NAME = TEXT("VoronoiVersion");
 FGuid GUID(0x8335131F, 0x7EA94C36, 0xBDAD5D6D, 0xB93EAD9F);
 FCustomVersionRegistration GRegisterVoronoiCustomVersion(GUID, 1, FRIENDLY_NAME);
 
+double FVoronoiFace::getKills(EStatisticKey key) const
+{
+	double result = 0;
+	if (this->onlineStats.kills.find(EStatisticKey::SKT_Bots_1) != this->onlineStats.kills.end())
+	{
+		result = this->onlineStats.kills.at(EStatisticKey::SKT_Bots_1);
+	}
+	return result;
+}
+
+double FVoronoiFace::getDeaths(EStatisticKey key) const
+{
+	double result = 0;
+	if (this->onlineStats.deaths.find(EStatisticKey::SKT_Bots_1) != this->onlineStats.deaths.end())
+	{
+		result = this->onlineStats.deaths.at(EStatisticKey::SKT_Bots_1);
+	}
+	return result;
+}
+
+TPreserveConstUniquePtr<FVoronoiFace>* FVoronoiGraph::GetNearestFaceToLoc(FVector location)
+{
+	TPreserveConstUniquePtr<FVoronoiFace>* result = nullptr;
+
+	for (auto& i : this->Surfaces)
+		for (auto& FacePtr : i->Faces) 
+		{
+			FVector faceLoc = FacePtr->Location;
+			if (!result || FVector::Dist(faceLoc, location) < FVector::Dist((*result)->Location, location))
+				result = &FacePtr;
+		}
+
+	return result;
+}
+
+void FVoronoiGraph::addOnlineStatisticInFromOldGraph(const FVoronoiGraph * oldGraph) 
+{
+	for (int i = 0; i < oldGraph->journal.kills.size(); i++) 
+	{
+		this->addKill(oldGraph->journal.kills[i].second, oldGraph->journal.kills[i].first);
+	}
+
+	for (int i = 0; i < oldGraph->journal.deaths.size(); i++) 
+	{
+		this->addDeath(oldGraph->journal.deaths[i].second, oldGraph->journal.deaths[i].first);
+	}
+}
+
+void FVoronoiGraph::diffusion(double& valueA, double& valueB, const double diffusion_coef) 
+{
+	const double a = valueA;
+	const double b = valueB;
+
+	valueA += diffusion_coef * (b - a);
+	valueB += diffusion_coef * (a - b);
+}
+
+void FVoronoiGraph::diffuseStatistic(EStatisticKey key, const double diffusion_coef)
+{
+	/*
+	struct cmpFVector 
+	{
+		bool operator()(const FVector& a, const FVector& b) const 
+		{
+			return a.X < b.X || (a.X == b.X && a.Y < b.Y) || (a.X == b.X && a.Y == b.Y && a.Z < b.Z);
+		}
+	};
+
+	std::map<FVector, std::pair<double, double>, cmpFVector> result;
+
+	for (const auto& surface : this->Surfaces)
+		for (const auto& face : surface->Faces) 
+		{
+			result[face->Location] = std::make_pair(face->onlineStats.deaths[key], face->onlineStats.kills[key]);
+		}
+
+
+	for (const auto& surface : this->Surfaces)
+		for (const auto& edge : surface->Edges) 
+		{
+			FVector faceALocation = edge->LeftFace->Location;
+			FVector faceBLocation = edge->RightFace->Location;
+			diffusion(result[faceALocation].first, result[faceBLocation].first, diffusion_coef);
+			diffusion(result[faceALocation].second, result[faceBLocation].second, diffusion_coef);
+		}
+
+
+	for (const auto& surface : this->Surfaces)
+		for (const auto& face : surface->Faces) 
+		{
+			face->onlineStats.deaths[key] = result[face->Location].first;
+			face->onlineStats.kills[key] = result[face->Location].second;
+		}
+	*/
+}
+
+void FVoronoiGraph::addKill(EStatisticKey entity, FVector location) 
+{
+	this->journal.kills.push_back(std::make_pair(location, entity));
+	(*GetNearestFaceToLoc(location))->onlineStats.kills[entity]++;
+}
+
+void FVoronoiGraph::addDeath(EStatisticKey entity, FVector location) 
+{
+	this->journal.kills.push_back(std::make_pair(location, entity));
+	(*GetNearestFaceToLoc(location))->onlineStats.deaths[entity]++;
+}
+
 bool FVoronoiGraph::Serialize(FArchive &Ar)
 {
     check(GeneratedSurfaces.Num() == 0);

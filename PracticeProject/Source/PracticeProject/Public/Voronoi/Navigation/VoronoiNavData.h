@@ -85,6 +85,8 @@ enum class EVoronoiFaceDrawingMode : uint8
     NEVisibility                UMETA(DisplayName = "North-East Visibility"),
     NWVisibility                UMETA(DisplayName = "North-West Visibility"),
 
+	FragMapStatistic            UMETA(DisplayName = "Kill/Death statistic"),
+
     None                        UMETA(DisplayName = "None")
 };
 
@@ -97,6 +99,10 @@ struct PRACTICEPROJECT_API FVoronoiDrawingOptions
     /** Indicates the way faces are rendered */
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     EVoronoiFaceDrawingMode FaceDrawingMode;
+
+	/*  Indicates statistics for which EStatisticKey is displayed (if FaceDrawingMode == FragMapStatistic)*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	EStatisticKey statkey;
 
     /** Indicates whether to draw edges */
     UPROPERTY(EditAnywhere, BlueprintReadOnly)

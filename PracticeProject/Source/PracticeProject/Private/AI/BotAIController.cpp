@@ -121,7 +121,11 @@ const FVoronoiQuerierParameters& ABotAIController::GetVoronoiQuerierParameters()
 
 float ABotAIController::GetAdditionalPenalty(const FVoronoiFace *From, const FVoronoiFace *To) const
 {
-    return 0;
+	const double kills = To->getKills(EStatisticKey::SKT_Bots_1);
+	const double deaths = To->getDeaths(EStatisticKey::SKT_Bots_1);
+	const double probability = (deaths + 1) / (deaths + kills + 2);
+	const double dist = FVector::Dist(To->Location, From->Location) / 2;
+	return 100 * dist * probability;
 }
 
 FVector2D ABotAIController::GetInitialRotation() const

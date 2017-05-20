@@ -107,6 +107,8 @@ FColor UVoronoiRenderingComponent::SelectFaceColor(const FVoronoiFace *Face, con
         case EVoronoiFaceDrawingMode::NEVisibility:         return FColor(0, TacticalProperties.GetNEVisibility() * 4 * 255, 0, 200);
         case EVoronoiFaceDrawingMode::NWVisibility:         return FColor(0, TacticalProperties.GetNWVisibility() * 4 * 255, 0, 200);
 
+		case EVoronoiFaceDrawingMode::FragMapStatistic:      return FColor(Face->getDeaths(Options.statkey) * 255 / 10, Face->getKills(Options.statkey) * 255 / 10, 0, 200);
+
         default:                                            return FColor();
     }
 }

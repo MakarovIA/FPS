@@ -2,10 +2,14 @@
 
 #include "PracticeProject.h"
 #include "Bot.h"
+#include "VoronoiNavData.h"
+#include "SpawnPoint.h"
 
 ABot::ABot()
 {
     PrimaryActorTick.bCanEverTick = false;
+
+	statKey = EStatisticKey::SKT_Player;
 
     GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
     GetCapsuleComponent()->SetCollisionResponseToChannel(COLLISION_WEAPON, ECollisionResponse::ECR_Ignore);
@@ -49,6 +53,12 @@ void ABot::BeginPlay()
     if (BotState.Inventory.Num() > 0)
         EquipWeapon(0);
 }
+
+void ABot::setStatKey(EStatisticKey key)
+{
+	this->statKey = key;
+}
+
 
 void ABot::EquipWeapon(int32 Index)
 {
@@ -204,6 +214,30 @@ void ABot::Die()
     BotState.bDead = true;
 }
 
+void ABot::UpdateStatistic(AActor* cause)
+{
+	FVoronoiGraph* VoronoiGraph = (TActorIterator<AVoronoiNavData>(GetWorld()))->GetVoronoiGraph();
+
+	VoronoiGraph->addDeath(this->statKey, this->GetActorLocation());
+	AWeapon * weapon = dynamic_cast<AWeapon*>(cause);
+	if (weapon != nullptr) {
+		const ABot * killer = weapon->GetOwningBot();
+		VoronoiGraph->addKill(killer->statKey, killer->GetActorLocation());
+	}
+
+	TActorIterator<AVoronoiNavData>(GetWorld())->UpdateVoronoiGraphDrawing();
+}
+
+void ABot::informBotSpawn()
+{
+	
+	if (this->BotSpawn)
+	{
+		this->BotSpawn->OnBotDeath();
+	}
+	
+}
+
 float ABot::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
     if (BotState.bDead)
@@ -223,8 +257,12 @@ float ABot::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, ACon
 
     BotState.Health -= DamageAmount;
 
-    if (BotState.Health == 0)
-        Die();
+	if (BotState.Health == 0)
+	{
+		UpdateStatistic(DamageCauser);
+		Die();
+		informBotSpawn();
+	}
     
 	// Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
     return DamageAmount;

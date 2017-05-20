@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "VoronoiGraph.h"
+#include "SpawnPoint.h"
 #include "GameFramework/Character.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -107,7 +109,14 @@ class PRACTICEPROJECT_API ABot : public ACharacter
     FTimerHandle ReloadTimerHandle;
     void OnReloadCompleted();
 
-    void Die();
+	EStatisticKey statKey;
+	ASpawnPoint * BotSpawn;
+
+
+	// should be called before Die() method to update Kill/Death statistic
+	void UpdateStatistic(AActor* cause);
+	// should be called after Die() method to trigger OnBotDeath
+	void informBotSpawn();
 
 protected:
     void LookUp(float Value);
@@ -122,6 +131,20 @@ protected:
 
 public:
     ABot();
+
+	UFUNCTION(BlueprintCallable, Category = Bot)
+	void Die();
+
+	UFUNCTION(BlueprintCallable, Category = Bot)
+	void setStatKey(EStatisticKey key);
+
+
+	UFUNCTION(BlueprintCallable, Category = Bot)
+	void setBotSpawn(ASpawnPoint* spawn)
+	{
+		this->BotSpawn = spawn;
+	}
+
 
     void EquipWeapon(int32 Index);
 
