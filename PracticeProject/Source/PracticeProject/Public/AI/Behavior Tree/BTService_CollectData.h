@@ -1,5 +1,3 @@
-// By Polyakov Pavel
-
 #pragma once
 
 #include "BehaviorTree/BTService.h"

@@ -1,5 +1,3 @@
-// By Polyakov Pavel
-
 #include "PracticeProject.h"
 #include "HUDD.h"
 #include "Bot.h"
@@ -39,7 +37,7 @@ void AHUDD::DrawHUD()
 
 void AHUDD::DrawHealthbar()
 {
-	ABot* bot = Cast<ABot>(UGameplayStatics::GetPlayerPawn(GetWorld(), 0));
+	ABot* bot = Cast<ABot>(GetOwningPawn());
 	if (bot) {
 		float barWidth = 200, barHeight = 50, barPad = 12, barMargin = 50;
 		float percHp = bot->GetBotState().Health / bot->getMaxHealth();
@@ -51,7 +49,7 @@ void AHUDD::DrawHealthbar()
 
 void AHUDD::DrawWeaponName() 
 {
-	ABot* bot = Cast<ABot>(UGameplayStatics::GetPlayerPawn(GetWorld(), 0));
+	ABot* bot = Cast<ABot>(GetOwningPawn());
 	if (bot) {
 		FString CurrentWeaponName;
 		EWeaponType CurrentWeapon = bot->GetCurrentWeapon()->GetWeaponData().WeaponType;

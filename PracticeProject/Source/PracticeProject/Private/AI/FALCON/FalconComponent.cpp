@@ -1,7 +1,6 @@
-// By Polyakov Pavel
-
 #include "PracticeProject.h"
 #include "FalconComponent.h"
+#include "Misc/Paths.h"
 
 
 // Sets default values for this component's properties
@@ -11,11 +10,12 @@ UFalconComponent::UFalconComponent()
 	// off to improve performance if you don't need them.
 
 	PrimaryComponentTick.bCanEverTick = true;
-
-	myFALCON = new NEWFALCON(numStates * 2, 4, 0.9f, 0.1f, 20, "C:\\Users\\Admin\\Downloads\\PracticeProject v2 4.13\\PracticeProject v2 4.13\\FALCON_data.txt",
-        "C:\\Users\\Admin\\Downloads\\PracticeProject v2 4.13\\PracticeProject v2 4.13\\FALCON_info.txt",
-        "C:\\Users\\Admin\\Downloads\\PracticeProject v2 4.13\\PracticeProject v2 4.13\\FALCON_stat.txt",
-        "C:\\Users\\Admin\\Downloads\\PracticeProject v2 4.13\\PracticeProject v2 4.13\\FALCON_data.txt");
+	FString gameDir = FPaths::ConvertRelativePathToFull(FPaths::GameDir());
+	string gameDirS = TCHAR_TO_UTF8(*gameDir);
+	myFALCON = new NEWFALCON(numStates * 2, 4, 0.9f, 0.1f, 20, gameDirS + "\\FALCON_data.txt",
+		gameDirS + "\\FALCON_info.txt",
+		gameDirS + "\\FALCON_stat.txt",
+		gameDirS + "\\FALCON_data.txt");
 	reward = 0;
 }
 

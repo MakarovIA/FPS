@@ -1,5 +1,3 @@
-// By Polyakov Pavel
-
 #pragma once
 
 #include "VoronoiNavData.h"

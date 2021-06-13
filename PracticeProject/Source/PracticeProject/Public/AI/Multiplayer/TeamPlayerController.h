@@ -1,5 +1,3 @@
-// By Polyakov Pavel
-
 #pragma once
 
 #include "GameFramework/PlayerController.h"

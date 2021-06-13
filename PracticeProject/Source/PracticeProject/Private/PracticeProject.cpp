@@ -1,5 +1,3 @@
-// By Polyakov Pavel
-
 #include "PracticeProject.h"
 
 IMPLEMENT_PRIMARY_GAME_MODULE(FDefaultGameModuleImpl, PracticeProject, "PracticeProject");

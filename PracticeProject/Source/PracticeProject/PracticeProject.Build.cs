@@ -1,5 +1,3 @@
-// By Polyakov Pavel
-
 using UnrealBuildTool;
 
 public class PracticeProject : ModuleRules

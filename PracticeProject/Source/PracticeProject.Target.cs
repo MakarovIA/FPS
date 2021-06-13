@@ -1,5 +1,3 @@
-// By Polyakov Pavel
-
 using UnrealBuildTool;
 using System.Collections.Generic;
 

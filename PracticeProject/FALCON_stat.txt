@@ -1,0 +1,24 @@
+weapon 0:
+	selected: 0
+	expected visibility percentage: 0
+	expected distance: 0
+	success: 0
+	expected reward: 0
+weapon 1:
+	selected: 0
+	expected visibility percentage: 0
+	expected distance: 0
+	success: 0
+	expected reward: 0
+weapon 2:
+	selected: 0
+	expected visibility percentage: 0
+	expected distance: 0
+	success: 0
+	expected reward: 0
+weapon 3:
+	selected: 0
+	expected visibility percentage: 0
+	expected distance: 0
+	success: 0
+	expected reward: 0

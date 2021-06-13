@@ -1,5 +1,3 @@
-// By Polyakov Pavel
-
 #pragma once
 
 #include "Gameplay/Weapons/Weapon.h"

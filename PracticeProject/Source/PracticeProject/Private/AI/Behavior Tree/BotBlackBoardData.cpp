@@ -1,5 +1,3 @@
-// By Polyakov Pavel
-
 #include "PracticeProject.h"
 #include "BotBlackBoardData.h"
 

@@ -50,11 +50,11 @@ FPrimitiveSceneProxy* UVoronoiRenderingComponent::CreateSceneProxy()
             if (DrawingOptions.bDrawSurfaces)
                 for (const TArray<FVector> &Border : Surface->Borders)
                     for (int32 i = 0, sz = Border.Num(); i < sz; ++i)
-                        Data.Lines.Emplace(Border[i == 0 ? Border.Num() - 1 : i - 1], Border[i], FColor(15, 55, 40), 5.f);
+                        Data.Lines.Emplace(Border[i == 0 ? Border.Num() - 1 : i - 1], Border[i], FColor(0, 0, 0), 5.f); //FColor(15, 55, 40), 5.f);
 
 			if (DrawingOptions.bDrawEdges)
 				for (const FVoronoiEdge* Edge : Surface->Edges)
-					Data.Lines.Emplace(Edge->FirstVertex->Location, Edge->LastVertex->Location, FColor(0, 255, 0));
+					Data.Lines.Emplace(Edge->FirstVertex->Location, Edge->LastVertex->Location, FColor(0, 0, 0, 255), 5.f);
 
             for (const TPreserveConstUniquePtr<FVoronoiFace>& Face : Surface->Faces)
             {
@@ -91,11 +91,15 @@ FColor UVoronoiRenderingComponent::SelectFaceColor(const FVoronoiFace *Face, con
 {
     const FVoronoiTacticalProperties& TacticalProperties = Face->TacticalProperties;
     const uint32 SurfaceId = *(const uint32*)(const FVoronoiSurface*)Face->Surface;
-
+	float vis = TacticalProperties.GetFullVisibility();// *TacticalProperties.GetFullVisibility();
+	float r = static_cast <float> (rand()) / static_cast <float> (1);
+	vis = r;
+	//vis = vis * vis;
+	
     switch (Options.FaceDrawingMode)
     {
         case EVoronoiFaceDrawingMode::Standard:             return FColor((100 + SurfaceId) % 255, (200 + SurfaceId * 3) % 255, (60 + SurfaceId * 7) % 255, 200);
-        case EVoronoiFaceDrawingMode::Visibility:           return FColor(0, TacticalProperties.GetFullVisibility() * 255, 0, 200);
+        case EVoronoiFaceDrawingMode::Visibility:           return FColor(2 * vis * 255, (1-vis) * 255, 0, 200);
 
         case EVoronoiFaceDrawingMode::SVisibility:          return FColor(0, TacticalProperties.GetSVisibility() * 4 * 255, 0, 200);
         case EVoronoiFaceDrawingMode::WVisibility:          return FColor(0, TacticalProperties.GetWVisibility() * 4 * 255, 0, 200);
@@ -107,7 +111,7 @@ FColor UVoronoiRenderingComponent::SelectFaceColor(const FVoronoiFace *Face, con
         case EVoronoiFaceDrawingMode::NEVisibility:         return FColor(0, TacticalProperties.GetNEVisibility() * 4 * 255, 0, 200);
         case EVoronoiFaceDrawingMode::NWVisibility:         return FColor(0, TacticalProperties.GetNWVisibility() * 4 * 255, 0, 200);
 
-        default:                                            return FColor();
+        default:                                            return FColor(255, 0, 0);
     }
 }
 
